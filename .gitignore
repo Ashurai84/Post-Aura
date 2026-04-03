@@ -1,0 +1,25 @@
+node_modules/
+build/
+dist/
+frontend/dist/
+coverage/
+.DS_Store
+*.log
+
+# Secrets and local overrides — never commit
+.env
+backend/.env
+frontend/.env
+frontend/.env.local
+admin/.env
+
+# Sensitive Admin Code — Excluded per user request
+admin/
+
+# Firebase JSON export
+firebase-applet-config.json
+firebase-blueprint.json
+
+.idea/
+.vscode/
+*.swp

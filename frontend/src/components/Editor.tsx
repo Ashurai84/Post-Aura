@@ -1,0 +1,850 @@
+import { useState, useEffect, useRef } from "react";
+import { Button } from "./ui/button";
+import { Textarea } from "./ui/textarea";
+import { Input } from "./ui/input";
+import { synthesizePost, iteratePost, SynthesizeResult } from "../lib/gemini";
+import { Post, HistoryItem } from "../types";
+import {
+  Loader2, Copy, Check, ArrowRight, Wand2,
+  Undo2, History as HistoryIcon, Trash2, RotateCcw,
+  Zap, Lightbulb, Flame, BookOpen, Trophy,
+  ChevronDown, Sparkles, Pencil, Settings2,
+  ThumbsUp, ThumbsDown
+} from "lucide-react";
+import { db, auth } from "../firebase";
+import { doc, updateDoc, setDoc, serverTimestamp, collection } from "firebase/firestore";
+import Markdown from "react-markdown";
+import { PaywallModal } from "./PaywallModal";
+
+// ── Quick Actions ──────────────────────────────────────────────
+const QUICK_ACTIONS = [
+  {
+    id: "attended",
+    icon: <Zap className="h-5 w-5" />,
+    emoji: "⚡",
+    label: "I attended something today",
+    placeholder: 'e.g. "Attended a talk by Meesho CTO at our college fest"',
+    audience: "College Students",
+    tone: "Conversational",
+  },
+  {
+    id: "built",
+    icon: <Sparkles className="h-5 w-5" />,
+    emoji: "🛠️",
+    label: "I built something",
+    placeholder: 'e.g. "Built a URL shortener using Redis and Node.js"',
+    audience: "College Students",
+    tone: "Professional",
+  },
+  {
+    id: "learned",
+    icon: <Lightbulb className="h-5 w-5" />,
+    emoji: "💡",
+    label: "I learned something",
+    placeholder: 'e.g. "Learned how Docker containers actually work"',
+    audience: "College Students",
+    tone: "Inspirational",
+  },
+  {
+    id: "hottake",
+    icon: <Flame className="h-5 w-5" />,
+    emoji: "🔥",
+    label: "I have a hot take",
+    placeholder: 'e.g. "DSA alone won\'t get you a good job anymore"',
+    audience: "General Public",
+    tone: "Controversial",
+  },
+  {
+    id: "story",
+    icon: <BookOpen className="h-5 w-5" />,
+    emoji: "📖",
+    label: "I want to share a story",
+    placeholder: 'e.g. "How I went from 0 to 500 LinkedIn followers in 2 months"',
+    audience: "College Students",
+    tone: "Conversational",
+  },
+];
+
+// ── Types ──────────────────────────────────────────────────────
+interface EditorProps {
+  post: Partial<Post> | null;
+  userId: string;
+  onPostUpdated: (post: Post) => void;
+  weeklyPostCount: number;
+  weeklyGoal: number;
+  postsToReview: Post[];
+}
+
+type EditorPhase = "select" | "input" | "result";
+
+// ── Component ──────────────────────────────────────────────────
+export function Editor({ post, userId, onPostUpdated, weeklyPostCount, weeklyGoal, postsToReview }: EditorProps) {
+  // Core state
+  const [phase, setPhase] = useState<EditorPhase>("select");
+  const [selectedAction, setSelectedAction] = useState<typeof QUICK_ACTIONS[0] | null>(null);
+  const [rawInput, setRawInput] = useState("");
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [customAudience, setCustomAudience] = useState("");
+  const [customTone, setCustomTone] = useState("");
+  const [takeaway, setTakeaway] = useState("");
+
+  // Post state
+  const [content, setContent] = useState("");
+  const [topic, setTopic] = useState("");
+  const [audience, setAudience] = useState("");
+  const [tone, setTone] = useState("");
+  const [history, setHistory] = useState<HistoryItem[]>([]);
+
+  // UI state
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const [showPaywall, setShowPaywall] = useState(false);
+  const [iterationInstruction, setIterationInstruction] = useState("");
+  const [copied, setCopied] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [feedbackState, setFeedbackState] = useState<"pending" | "approved" | "rejected" | "fixing">("pending");
+  const [showFeedbackOptions, setShowFeedbackOptions] = useState(false);
+  const [voiceTags, setVoiceTags] = useState<string[]>([]);
+  const [postsAnalyzed, setPostsAnalyzed] = useState(0);
+
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  // ── Sync with post prop ────────────────────────────────────
+  useEffect(() => {
+    if (post && post.content) {
+      setTopic(post.topic || "");
+      setAudience(post.audience || "");
+      setTone(post.tone || "");
+      setContent(post.content || "");
+      setHistory(post.history || []);
+      setPhase("result");
+    } else {
+      // Reset for new post
+      setPhase("select");
+      setSelectedAction(null);
+      setRawInput("");
+      setTakeaway("");
+      setContent("");
+      setTopic("");
+      setAudience("");
+      setTone("");
+      setHistory([]);
+      setShowAdvanced(false);
+      setShowHistory(false);
+      setIsEditing(false);
+    }
+  }, [post]);
+
+  // Auto-focus input when entering input phase
+  useEffect(() => {
+    if (phase === "input" && inputRef.current) {
+      setTimeout(() => inputRef.current?.focus(), 100);
+    }
+  }, [phase]);
+
+  // ── Handlers ───────────────────────────────────────────────
+  const handleSelectAction = (action: typeof QUICK_ACTIONS[0]) => {
+    setSelectedAction(action);
+    setCustomAudience(action.audience);
+    setCustomTone(action.tone);
+    setPhase("input");
+  };
+
+  const handleGenerate = async () => {
+    if (!rawInput.trim() || !takeaway.trim()) return;
+
+    const finalAudience = showAdvanced && customAudience ? customAudience : (selectedAction?.audience || "College Students");
+    const finalTone = showAdvanced && customTone ? customTone : (selectedAction?.tone || "Conversational");
+
+    setTopic(rawInput);
+    setAudience(finalAudience);
+    setTone(finalTone);
+    setIsGenerating(true);
+
+    try {
+      const { result: generatedText, voiceTags: tags, postsAnalyzed: count } = await synthesizePost(rawInput, takeaway, finalAudience, finalTone);
+      setVoiceTags(tags);
+      setPostsAnalyzed(count);
+
+      const newHistoryItem: HistoryItem = {
+        content: generatedText,
+        label: "Initial Generation",
+        timestamp: new Date(),
+      };
+
+      const newHistory = [newHistoryItem];
+      setContent(generatedText);
+      setHistory(newHistory);
+      setPhase("result");
+      setFeedbackState("pending");
+      setShowFeedbackOptions(false);
+
+      await savePost(rawInput, finalAudience, finalTone, generatedText, newHistory);
+    } catch (error: any) {
+      console.error("Synthesize error:", error);
+      if (error.message === "UPGRADE_REQUIRED") {
+        setShowPaywall(true);
+      } else if (error.message === "QUOTA_EXCEEDED") {
+        alert("Gemini API quota exceeded. Try again later or check your plan.");
+      } else {
+        alert("Failed to generate. Please try again.");
+      }
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const handleIterate = async (instruction: string) => {
+    if (!content || !instruction.trim()) return;
+
+    setIsGenerating(true);
+    try {
+      const result = await iteratePost(content, instruction);
+      const newHistoryItem: HistoryItem = {
+        content: result,
+        label: instruction,
+        timestamp: new Date(),
+      };
+      const newHistory = [...history, newHistoryItem];
+      setContent(result);
+      setHistory(newHistory);
+      setIterationInstruction("");
+
+      await savePost(topic, audience, tone, result, newHistory);
+    } catch (error: any) {
+      console.error("Iterate error:", error);
+      if (error.message === "UPGRADE_REQUIRED") {
+        setShowPaywall(true);
+      } else if (error.message === "QUOTA_EXCEEDED") {
+        alert("Gemini API quota exceeded. Try again later.");
+      } else {
+        alert("Failed to iterate. Please try again.");
+      }
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const handleUndo = async () => {
+    if (history.length <= 1) return;
+    const newHistory = history.slice(0, -1);
+    const previousItem = newHistory[newHistory.length - 1];
+    setContent(previousItem.content);
+    setHistory(newHistory);
+    await savePost(topic, audience, tone, previousItem.content, newHistory);
+  };
+
+  const handleRevertTo = async (index: number) => {
+    const selectedItem = history[index];
+    const newHistory = history.slice(0, index + 1);
+    setContent(selectedItem.content);
+    setHistory(newHistory);
+    setShowHistory(false);
+    await savePost(topic, audience, tone, selectedItem.content, newHistory);
+  };
+
+  const handleDeleteHistoryItem = async (index: number) => {
+    if (history.length <= 1) return;
+    const newHistory = history.filter((_, i) => i !== index);
+    if (index === history.length - 1) {
+      const lastItem = newHistory[newHistory.length - 1];
+      setContent(lastItem.content);
+    }
+    setHistory(newHistory);
+    await savePost(topic, audience, tone, content, newHistory);
+  };
+
+  const savePost = async (t: string, a: string, tn: string, c: string, h: HistoryItem[]) => {
+    try {
+      if (post?.id) {
+        const postRef = doc(db, "posts", post.id);
+        await updateDoc(postRef, {
+          topic: t, audience: a, tone: tn, content: c, history: h,
+          updatedAt: serverTimestamp(),
+        });
+        onPostUpdated({ ...post, topic: t, audience: a, tone: tn, content: c, history: h, updatedAt: new Date() } as Post);
+      } else {
+        const newPostRef = doc(collection(db, "posts"));
+        const newPostData = {
+          userId, topic: t, audience: a, tone: tn, content: c, history: h,
+          createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+        };
+        await setDoc(newPostRef, newPostData);
+        onPostUpdated({ ...newPostData, id: newPostRef.id, createdAt: new Date(), updatedAt: new Date() } as Post);
+      }
+    } catch (error) {
+      console.error("Error saving post:", error);
+    }
+  };
+
+  const copyToClipboard = () => {
+    navigator.clipboard.writeText(content);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+
+    // Mark copiedAt for the 24h review loop
+    if (post?.id) {
+      const postRef = doc(db, "posts", post.id);
+      updateDoc(postRef, { copiedAt: serverTimestamp() }).catch(e => console.warn("copiedAt update failed:", e));
+    }
+  };
+
+  // ── Handle performance review ───────────────────────────────
+  const handlePerformanceReview = async (postId: string, rating: "hot" | "average" | "flopped") => {
+    try {
+      const postRef = doc(db, "posts", postId);
+      await updateDoc(postRef, { performance: rating });
+    } catch (error) {
+      console.error("Performance review error:", error);
+    }
+  };
+
+  const handleStartNew = () => {
+    setPhase("select");
+    setSelectedAction(null);
+    setRawInput("");
+    setTakeaway("");
+    setContent("");
+    setTopic("");
+    setAudience("");
+    setTone("");
+    setHistory([]);
+    setShowAdvanced(false);
+    setShowHistory(false);
+    setIsEditing(false);
+    onPostUpdated({ id: undefined } as Post); // Signal parent to deselect
+  };
+
+  // ── Weekly Progress Ring ───────────────────────────────────
+  const progressPercent = Math.min((weeklyPostCount / weeklyGoal) * 100, 100);
+  const circumference = 2 * Math.PI * 18;
+  const strokeDashoffset = circumference - (progressPercent / 100) * circumference;
+
+  // ── Send voice feedback to backend ─────────────────────────
+  const sendVoiceFeedback = async (type: "approved" | "rejected", reason: string | null) => {
+    try {
+      const user = auth.currentUser;
+      if (!user) return;
+      const token = await user.getIdToken();
+      const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+      await fetch(`${API_URL}/api/ai/voice-feedback`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ type, reason, content }),
+      });
+    } catch (e) {
+      console.warn("Voice feedback failed:", e);
+    }
+  };
+
+  // ── RENDER ─────────────────────────────────────────────────
+  return (
+    <div className="flex-1 flex flex-col h-full overflow-hidden bg-background">
+      <div className="flex-1 overflow-y-auto">
+        <div className="max-w-2xl mx-auto w-full px-4 py-6 md:px-6 md:py-10 space-y-8">
+
+          {/* ── Weekly Progress ─────────────────────────── */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="relative w-12 h-12">
+                <svg className="w-12 h-12 -rotate-90" viewBox="0 0 40 40">
+                  <circle cx="20" cy="20" r="18" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-muted/40" />
+                  <circle
+                    cx="20" cy="20" r="18" fill="none"
+                    stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"
+                    strokeDasharray={circumference} strokeDashoffset={strokeDashoffset}
+                    className={progressPercent >= 100 ? "text-emerald-500" : "text-primary"}
+                    style={{ transition: "stroke-dashoffset 0.6s ease" }}
+                  />
+                </svg>
+                <span className="absolute inset-0 flex items-center justify-center text-xs font-bold">
+                  {weeklyPostCount >= weeklyGoal ? "🎉" : `${weeklyPostCount}/${weeklyGoal}`}
+                </span>
+              </div>
+              <div>
+                <p className="text-sm font-semibold">
+                  {weeklyPostCount >= weeklyGoal
+                    ? "Weekly goal hit! 🔥"
+                    : `${weeklyGoal - weeklyPostCount} more to hit your goal`}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {weeklyPostCount >= weeklyGoal
+                    ? "You're outpacing most LinkedIn users"
+                    : "Don't fall behind your peers"}
+                </p>
+              </div>
+            </div>
+            {weeklyPostCount > 0 && weeklyPostCount < weeklyGoal && (
+              <div className="flex items-center gap-1 text-xs font-medium text-amber-600 bg-amber-50 dark:bg-amber-500/10 px-3 py-1.5 rounded-full border border-amber-200 dark:border-amber-500/20">
+                <Flame className="h-3 w-3" />
+                Keep going
+              </div>
+            )}
+          </div>
+
+          {/* ── Post Performance Review (24h+ unreviewed) ── */}
+          {postsToReview.length > 0 && phase === "select" && (
+            <div className="space-y-3">
+              {postsToReview.slice(0, 2).map((reviewPost) => (
+                <div key={reviewPost.id} className="bg-gradient-to-r from-amber-500/8 to-orange-500/5 border border-amber-500/20 rounded-xl p-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                  <p className="text-sm font-semibold mb-1">How did this post perform?</p>
+                  <p className="text-xs text-muted-foreground mb-3 line-clamp-2 italic">
+                    "{reviewPost.content.slice(0, 100).replace(/\n/g, ' ')}…"
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handlePerformanceReview(reviewPost.id!, "hot")}
+                      className="flex-1 h-9 rounded-lg text-xs font-medium border border-emerald-300/50 bg-emerald-50/50 hover:bg-emerald-100 dark:bg-emerald-500/10 dark:hover:bg-emerald-500/20 transition-all flex items-center justify-center gap-1.5"
+                    >
+                      🔥 Performed well
+                    </button>
+                    <button
+                      onClick={() => handlePerformanceReview(reviewPost.id!, "average")}
+                      className="flex-1 h-9 rounded-lg text-xs font-medium border border-border bg-muted/30 hover:bg-muted/60 transition-all flex items-center justify-center gap-1.5"
+                    >
+                      👍 Average
+                    </button>
+                    <button
+                      onClick={() => handlePerformanceReview(reviewPost.id!, "flopped")}
+                      className="flex-1 h-9 rounded-lg text-xs font-medium border border-rose-300/50 bg-rose-50/50 hover:bg-rose-100 dark:bg-rose-500/10 dark:hover:bg-rose-500/20 transition-all flex items-center justify-center gap-1.5"
+                    >
+                      👎 Flopped
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* ═══════ PHASE: SELECT ═══════ */}
+          {phase === "select" && (
+            <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <div className="text-center space-y-2 pt-4">
+                <h2 className="text-2xl md:text-3xl font-bold tracking-tight">
+                  What did you do today?
+                </h2>
+                <p className="text-muted-foreground text-sm">
+                  Tap one. We'll handle the rest.
+                </p>
+              </div>
+
+              <div className="grid gap-3">
+                {QUICK_ACTIONS.map((action) => (
+                  <button
+                    key={action.id}
+                    onClick={() => handleSelectAction(action)}
+                    className="group flex items-center gap-4 p-4 rounded-2xl border bg-card hover:bg-primary/5 hover:border-primary/30 transition-all duration-200 text-left active:scale-[0.98]"
+                  >
+                    <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary group-hover:bg-primary/15 transition-colors shrink-0">
+                      {action.icon}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-sm">{action.label}</p>
+                      <p className="text-xs text-muted-foreground truncate mt-0.5">{action.placeholder}</p>
+                    </div>
+                    <ArrowRight className="h-4 w-4 text-muted-foreground/50 group-hover:text-primary group-hover:translate-x-0.5 transition-all shrink-0" />
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ═══════ PHASE: INPUT ═══════ */}
+          {phase === "input" && selectedAction && (
+            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-400">
+              {/* Back link */}
+              <button
+                onClick={() => { setPhase("select"); setRawInput(""); setTakeaway(""); setShowAdvanced(false); }}
+                className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
+              >
+                ← Back
+              </button>
+
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-2xl">{selectedAction.emoji}</span>
+                  <h2 className="text-xl font-bold tracking-tight">{selectedAction.label}</h2>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Tell us in 1–2 lines. That's all we need.
+                </p>
+              </div>
+
+              <Textarea
+                ref={inputRef}
+                value={rawInput}
+                onChange={(e) => setRawInput(e.target.value)}
+                placeholder={selectedAction.placeholder}
+                className="min-h-[100px] text-base resize-none rounded-xl border-2 focus:border-primary/50 transition-colors"
+                disabled={isGenerating}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    handleGenerate();
+                  }
+                }}
+              />
+
+              {/* Takeaway — mandatory */}
+              <div className="space-y-2">
+                <label className="text-sm font-semibold flex items-center gap-1.5">
+                  🎯 What's your main takeaway?
+                  <span className="text-xs font-normal text-destructive">*required</span>
+                </label>
+                <Input
+                  value={takeaway}
+                  onChange={(e) => setTakeaway(e.target.value)}
+                  placeholder='e.g. "AI agents will replace 80% of repetitive dev work"'
+                  className="h-11 text-base rounded-xl border-2 focus:border-primary/50 transition-colors"
+                  disabled={isGenerating}
+                />
+                <p className="text-[11px] text-muted-foreground">
+                  This is YOUR opinion — it's what makes the post sound like you, not a robot.
+                </p>
+              </div>
+
+              {/* Advanced toggle */}
+              <div>
+                <button
+                  onClick={() => setShowAdvanced(!showAdvanced)}
+                  className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
+                >
+                  <Settings2 className="h-3 w-3" />
+                  {showAdvanced ? "Hide" : "Customize"} audience & tone
+                  <ChevronDown className={`h-3 w-3 transition-transform ${showAdvanced ? "rotate-180" : ""}`} />
+                </button>
+
+                {showAdvanced && (
+                  <div className="mt-3 grid grid-cols-2 gap-3 animate-in fade-in slide-in-from-top-2 duration-200">
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-medium text-muted-foreground">Audience</label>
+                      <select
+                        value={customAudience}
+                        onChange={(e) => setCustomAudience(e.target.value)}
+                        className="w-full h-9 px-3 rounded-lg border bg-background text-sm"
+                      >
+                        <option value="College Students">College Students</option>
+                        <option value="High School Students">High School Students</option>
+                        <option value="General Public">General Public</option>
+                        <option value="Parents">Parents</option>
+                        <option value="Alumni">Alumni</option>
+                        <option value="University Administrators">University Administrators</option>
+                      </select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-medium text-muted-foreground">Tone</label>
+                      <select
+                        value={customTone}
+                        onChange={(e) => setCustomTone(e.target.value)}
+                        className="w-full h-9 px-3 rounded-lg border bg-background text-sm"
+                      >
+                        <option value="Professional">Professional</option>
+                        <option value="Conversational">Conversational</option>
+                        <option value="Inspirational">Inspirational</option>
+                        <option value="Controversial">Controversial</option>
+                        <option value="Data-driven">Data-driven</option>
+                      </select>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Generate button */}
+              <Button
+                onClick={handleGenerate}
+                disabled={!rawInput.trim() || !takeaway.trim() || isGenerating}
+                className="w-full h-12 rounded-xl text-base font-semibold shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all"
+                size="lg"
+              >
+                {isGenerating ? (
+                  <><Loader2 className="h-5 w-5 animate-spin mr-2" /> Crafting your post...</>
+                ) : (
+                  <><Sparkles className="h-5 w-5 mr-2" /> Generate Post</>
+                )}
+              </Button>
+            </div>
+          )}
+
+          {/* ═══════ PHASE: RESULT ═══════ */}
+          {phase === "result" && content && (
+            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+
+              {/* ── Post Card ─────────────────────────────── */}
+              <div className="rounded-2xl border-2 border-border/60 bg-card shadow-xl shadow-black/5 overflow-hidden">
+                {/* LinkedIn-style header */}
+                <div className="flex items-center gap-3 p-4 pb-3 border-b bg-muted/20">
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center border border-primary/20">
+                    <span className="font-bold text-primary text-sm">You</span>
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-semibold text-sm">Your Name</p>
+                    <p className="text-[11px] text-muted-foreground">Just now · 🌐</p>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    {history.length > 1 && (
+                      <Button variant="ghost" size="sm" className="h-8 px-2.5 text-xs" onClick={handleUndo} disabled={isGenerating}>
+                        <Undo2 className="h-3.5 w-3.5 mr-1" /> Undo
+                      </Button>
+                    )}
+                    <Button variant="ghost" size="sm" className="h-8 px-2.5 text-xs" onClick={() => setShowHistory(!showHistory)}>
+                      <HistoryIcon className="h-3.5 w-3.5 mr-1" /> {history.length}
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Post content */}
+                <div className="p-4 md:p-5">
+                  {isEditing ? (
+                    <Textarea
+                      value={content}
+                      onChange={(e) => setContent(e.target.value)}
+                      className="min-h-[200px] text-[15px] leading-relaxed resize-y border-0 p-0 focus-visible:ring-0 bg-transparent"
+                    />
+                  ) : (
+                    <div className="prose prose-sm max-w-none dark:prose-invert text-[15px] leading-relaxed">
+                      <Markdown>{content}</Markdown>
+                    </div>
+                  )}
+                </div>
+
+                {/* Actions bar */}
+                <div className="flex items-center justify-between px-4 py-3 border-t bg-muted/10">
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="ghost" size="sm"
+                      className="h-8 px-2.5 text-xs"
+                      onClick={() => setIsEditing(!isEditing)}
+                    >
+                      <Pencil className="h-3.5 w-3.5 mr-1" />
+                      {isEditing ? "Done" : "Edit"}
+                    </Button>
+                  </div>
+                  <Button
+                    onClick={copyToClipboard}
+                    className="h-9 px-5 rounded-full font-semibold text-sm shadow-sm"
+                  >
+                    {copied ? (
+                      <><Check className="h-4 w-4 mr-1.5 text-emerald-300" /> Copied!</>
+                    ) : (
+                      <><Copy className="h-4 w-4 mr-1.5" /> Copy to LinkedIn</>
+                    )}
+                  </Button>
+                </div>
+              </div>
+
+              {/* ── Visible Intelligence: Voice Tags ──────── */}
+              {voiceTags.length > 0 && (
+                <div className="flex items-center gap-2 flex-wrap animate-in fade-in duration-300">
+                  <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Writing in your style:</span>
+                  {voiceTags.map((tag) => (
+                    <span key={tag} className="text-[11px] font-medium px-2.5 py-1 rounded-full bg-primary/10 text-primary border border-primary/15">
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {/* ── Progress Milestone ────────────────────── */}
+              {postsAnalyzed >= 5 && postsAnalyzed % 5 === 0 && (
+                <div className="bg-gradient-to-r from-emerald-500/10 to-emerald-500/5 border border-emerald-500/20 rounded-xl p-3 text-center animate-in fade-in zoom-in-95 duration-500">
+                  <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">
+                    🧠 PostAura has analyzed {postsAnalyzed} of your posts
+                  </p>
+                  <p className="text-[11px] text-emerald-600/80 dark:text-emerald-500/80 mt-0.5">
+                    Your writing DNA is getting sharper with every post
+                  </p>
+                </div>
+              )}
+
+              {/* ── Feedback Loop (Step 2 — feels required) ── */}
+              {feedbackState === "pending" && !isGenerating && (
+                <div className="bg-gradient-to-br from-primary/8 via-primary/5 to-transparent border-2 border-primary/20 rounded-xl p-5 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="text-[10px] font-bold uppercase tracking-widest bg-primary text-primary-foreground px-2 py-0.5 rounded-full">Step 2</span>
+                    <p className="text-sm font-semibold">Quick check — does this sound like you?</p>
+                  </div>
+                  <div className="flex gap-3">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="flex-1 h-11 rounded-xl border-2 border-emerald-300 hover:bg-emerald-50 hover:border-emerald-400 dark:hover:bg-emerald-500/10 transition-all font-semibold"
+                      onClick={() => {
+                        setFeedbackState("approved");
+                        sendVoiceFeedback("approved", null);
+                      }}
+                    >
+                      <ThumbsUp className="h-4 w-4 mr-2 text-emerald-600" />
+                      Yes, this is me 🔥
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="flex-1 h-11 rounded-xl border-2 border-amber-300 hover:bg-amber-50 hover:border-amber-400 dark:hover:bg-amber-500/10 transition-all font-semibold"
+                      onClick={() => {
+                        setFeedbackState("rejected");
+                        setShowFeedbackOptions(true);
+                      }}
+                    >
+                      <ThumbsDown className="h-4 w-4 mr-2 text-amber-600" />
+                      Not quite
+                    </Button>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground mt-2 text-center">
+                    This teaches PostAura your voice — posts get better every time
+                  </p>
+                </div>
+              )}
+
+              {/* Approved — instant value insight */}
+              {feedbackState === "approved" && (
+                <div className="bg-gradient-to-r from-emerald-500/10 to-emerald-500/5 border border-emerald-500/25 rounded-xl p-4 animate-in fade-in zoom-in-95 duration-300">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-lg">✨</span>
+                    <p className="text-sm font-bold text-emerald-700 dark:text-emerald-400">Voice locked in. Your DNA just got stronger.</p>
+                  </div>
+                  <p className="text-xs text-emerald-600/80 dark:text-emerald-500/70">
+                    {postsAnalyzed <= 2
+                      ? "📈 We're learning your style — next post will be even closer to your voice"
+                      : `🧠 ${postsAnalyzed} posts analyzed. PostAura now writes ${voiceTags.length > 0 ? voiceTags.slice(0, 3).join(" + ") : "in your unique style"}`}
+                  </p>
+                </div>
+              )}
+
+              {/* What feels off? */}
+              {feedbackState === "rejected" && showFeedbackOptions && !isGenerating && (
+                <div className="border-2 border-amber-500/25 bg-gradient-to-br from-amber-500/8 to-transparent rounded-xl p-4 space-y-3 animate-in fade-in slide-in-from-top-2 duration-200">
+                  <p className="text-sm font-semibold">What feels off? <span className="text-xs font-normal text-muted-foreground">(we'll fix it + remember for next time)</span></p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {[
+                      { label: "🏢 Too formal", feedback: "too formal", instruction: "Rewrite this to be way more casual and conversational. Sound like a college student talking to peers, not a corporate exec. Use simpler words, shorter sentences, and a natural flow. Keep the bold formatting and emojis." },
+                      { label: "😐 Too generic", feedback: "too generic", instruction: "This feels too generic. Make it much more specific and personal — add concrete details, specific numbers or observations. Remove any advice that could apply to literally anyone. Keep the bold formatting and emojis." },
+                      { label: "🤷 Not my opinion", feedback: "not my opinion", instruction: "The author's personal takeaway/opinion isn't coming through strongly enough. Make the stance BOLDER and more provocative. The reader should know exactly what the author believes and why. Keep the bold formatting and emojis." },
+                      { label: "📏 Too long", feedback: "too long", instruction: "Cut this by 40%. Keep only the most impactful sentences. Remove all filler, unnecessary transitions, and generic lines. Be ruthless. Keep the bold formatting and emojis." },
+                    ].map((option) => (
+                      <Button
+                        key={option.label}
+                        variant="secondary"
+                        size="sm"
+                        className="h-10 text-xs rounded-lg justify-start font-medium"
+                        onClick={() => {
+                          setFeedbackState("fixing");
+                          setShowFeedbackOptions(false);
+                          sendVoiceFeedback("rejected", option.feedback);
+                          handleIterate(option.instruction);
+                          setTimeout(() => setFeedbackState("pending"), 100);
+                        }}
+                        disabled={isGenerating}
+                      >
+                        {option.label}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* ── Version History (collapsible) ─────────── */}
+              {showHistory && history.length > 0 && (
+                <div className="bg-muted/20 border rounded-xl p-4 space-y-3 animate-in fade-in slide-in-from-top-2 duration-200">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-semibold flex items-center gap-1.5 uppercase tracking-wider text-muted-foreground">
+                      <HistoryIcon className="h-3.5 w-3.5" /> Version History
+                    </h4>
+                    <span className="text-[10px] text-muted-foreground bg-muted px-2 py-0.5 rounded-full">{history.length} versions</span>
+                  </div>
+                  <div className="space-y-1.5 max-h-[180px] overflow-y-auto">
+                    {[...history].reverse().map((item, ri) => {
+                      const i = history.length - 1 - ri;
+                      return (
+                        <div key={i} className="flex items-center justify-between bg-background border rounded-lg p-2.5 text-xs group hover:border-primary/20 transition-colors">
+                          <div className="flex flex-col overflow-hidden">
+                            <span className="font-medium truncate">{item.label}</span>
+                            <span className="text-[10px] text-muted-foreground mt-0.5">
+                              {item.timestamp?.toDate ? item.timestamp.toDate().toLocaleString() : new Date(item.timestamp).toLocaleString()}
+                            </span>
+                          </div>
+                          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleRevertTo(i)} title="Revert">
+                              <RotateCcw className="h-3 w-3" />
+                            </Button>
+                            {history.length > 1 && (
+                              <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:text-destructive" onClick={() => handleDeleteHistoryItem(i)} title="Delete">
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* ── Iteration Dock ────────────────────────── */}
+              <div className="bg-muted/30 rounded-xl p-4 border space-y-3">
+                <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  <Wand2 className="h-3.5 w-3.5" /> Refine
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  {["Make it punchier", "Polarize", "Shorten", "Make it story-driven", "Add a CTA"].map((cmd) => (
+                    <Button
+                      key={cmd}
+                      variant="secondary"
+                      size="sm"
+                      className="h-8 text-xs rounded-full"
+                      onClick={() => handleIterate(cmd)}
+                      disabled={isGenerating}
+                    >
+                      {cmd}
+                    </Button>
+                  ))}
+                </div>
+
+                <div className="flex gap-2">
+                  <Input
+                    placeholder='e.g. "Add my newsletter CTA at the end"'
+                    value={iterationInstruction}
+                    onChange={(e) => setIterationInstruction(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleIterate(iterationInstruction)}
+                    disabled={isGenerating}
+                    className="text-sm rounded-xl"
+                  />
+                  <Button
+                    onClick={() => handleIterate(iterationInstruction)}
+                    disabled={!iterationInstruction.trim() || isGenerating}
+                    size="icon"
+                    className="shrink-0 rounded-xl"
+                  >
+                    {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}
+                  </Button>
+                </div>
+              </div>
+
+              {/* ── New Post button ───────────────────────── */}
+              <div className="text-center pt-2">
+                <button
+                  onClick={handleStartNew}
+                  className="text-xs text-muted-foreground hover:text-primary transition-colors underline underline-offset-4"
+                >
+                  + Start a new post
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ── Loading overlay for generation ────────── */}
+          {isGenerating && phase === "result" && (
+            <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center">
+              <div className="flex flex-col items-center gap-3 animate-pulse">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <p className="text-sm font-medium text-muted-foreground">Refining your post...</p>
+              </div>
+            </div>
+          )}
+
+        </div>
+      </div>
+      <PaywallModal isOpen={showPaywall} onClose={() => setShowPaywall(false)} />
+    </div>
+  );
+}
