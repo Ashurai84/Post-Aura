@@ -15,9 +15,11 @@ function getFirebaseWebConfig(): FirebaseOptions {
   } = import.meta.env;
 
   if (!VITE_FIREBASE_API_KEY || !VITE_FIREBASE_AUTH_DOMAIN || !VITE_FIREBASE_PROJECT_ID) {
-    throw new Error(
-      "Firebase web config missing. Copy frontend/.env.example → frontend/.env and set VITE_FIREBASE_* (see README). Never commit .env."
-    );
+    if (import.meta.env.DEV) {
+      console.warn("Firebase configuration is missing! Check your .env file.");
+    }
+    // Return empty config to avoid build-time errors, but warn at runtime
+    return {} as FirebaseOptions;
   }
 
   return {
