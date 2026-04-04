@@ -1,9 +1,4 @@
 {
-  "builds": [
-    {
-      "src": "admin/package.json",
-      "use": "@vercel/static-build",
-      "config": { "distDir": "dist" }
-    }
-  ]
+  "buildCommand": "cd admin && npm install && npm run build",
+  "outputDirectory": "admin/dist"
 }
