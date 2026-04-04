@@ -13,9 +13,6 @@ frontend/.env
 frontend/.env.local
 admin/.env
 
-# Sensitive Admin Code — Excluded per user request
-admin/
-
 # Firebase JSON export
 firebase-applet-config.json
 firebase-blueprint.json
