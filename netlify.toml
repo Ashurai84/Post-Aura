@@ -1,0 +1,4 @@
+[build]
+  command = "cd admin && npm install && npm run build"
+  publish = "admin/dist"
+  base = "."
