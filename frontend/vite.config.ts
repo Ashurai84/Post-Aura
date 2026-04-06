@@ -16,7 +16,6 @@ export default defineConfig(() => {
     resolve: {
       alias: {
         '@': path.resolve(__dirname, './src'),
-        '@admin': path.resolve(repoRoot, 'admin/src'),
       },
     },
     server: {
