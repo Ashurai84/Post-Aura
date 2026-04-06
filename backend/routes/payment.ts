@@ -29,15 +29,14 @@ router.post("/create-order", verifyFirebaseToken, async (req: AuthRequest, res) 
       const userRef = getAdminDb().collection("users").doc(req.user!.uid);
       const now = new Date();
       const expiresAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000); // 30 days
-
-      await userRef.update({
+      await userRef.set({
         isPro: true,
         planType: plan,
         planActivatedAt: FieldValue.serverTimestamp(),
         planExpiresAt: Timestamp.fromDate(expiresAt),
         instamojoPaymentId: "DEMO_PAYMENT_" + Math.random().toString(36).substring(7),
         updatedAt: FieldValue.serverTimestamp(),
-      });
+      }, { merge: true });
 
       return res.json({ payment_url: `${FRONTEND_URL}/payment/success?demo=true` });
     }

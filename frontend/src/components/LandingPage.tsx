@@ -7,6 +7,37 @@ import {
 } from "lucide-react";
 import { signInWithGoogle } from "../firebase";
 
+const FEATURES = [
+  {
+    icon: <Users className="h-6 w-6" />,
+    title: "Target Audience Choice",
+    desc: "Tailor your tone instantly. Choose between Students, CEOs, Founders, or a General audience to hit the right chord.",
+    glowClass: "bg-blue-500/10",
+    iconClass: "bg-blue-500/10 text-blue-600",
+  },
+  {
+    icon: <CalendarCheck className="h-6 w-6" />,
+    title: "Consistency Engine",
+    desc: "Never miss a day. PostAura helps you maintain your streak by turning small thoughts into full posts in seconds.",
+    glowClass: "bg-emerald-500/10",
+    iconClass: "bg-emerald-500/10 text-emerald-600",
+  },
+  {
+    icon: <Clock className="h-6 w-6" />,
+    title: "Time Flexibility",
+    desc: "Get smart suggestions on the best times to post based on your selected audience to maximize your reach.",
+    glowClass: "bg-purple-500/10",
+    iconClass: "bg-purple-500/10 text-purple-600",
+  },
+  {
+    icon: <ImageIcon className="h-6 w-6" />,
+    title: "AI Image Generation",
+    desc: "Stop searching for stock photos. Generate custom, high-res visuals that perfectly match your post's vibe.",
+    glowClass: "bg-orange-500/10",
+    iconClass: "bg-orange-500/10 text-orange-600",
+  },
+];
+
 export function LandingPage() {
   const fadeUp = {
     hidden: { opacity: 0, y: 40 },
@@ -192,38 +223,13 @@ export function LandingPage() {
             initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-100px" }} variants={staggerContainer}
             className="grid md:grid-cols-2 lg:grid-cols-4 gap-6"
           >
-            {[
-              {
-                icon: <Users className="h-6 w-6" />,
-                title: "Target Audience Choice",
-                desc: "Tailor your tone instantly. Choose between Students, CEOs, Founders, or a General audience to hit the right chord.",
-                color: "blue"
-              },
-              {
-                icon: <CalendarCheck className="h-6 w-6" />,
-                title: "Consistency Engine",
-                desc: "Never miss a day. PostAura helps you maintain your streak by turning small thoughts into full posts in seconds.",
-                color: "emerald"
-              },
-              {
-                icon: <Clock className="h-6 w-6" />,
-                title: "Time Flexibility",
-                desc: "Get smart suggestions on the best times to post based on your selected audience to maximize your reach.",
-                color: "purple"
-              },
-              {
-                icon: <ImageIcon className="h-6 w-6" />,
-                title: "AI Image Generation",
-                desc: "Stop searching for stock photos. Generate custom, high-res visuals that perfectly match your post's vibe.",
-                color: "orange"
-              }
-            ].map((feature, i) => (
+            {FEATURES.map((feature, i) => (
               <motion.div 
                 key={i} variants={fadeUp} whileHover={{ y: -5 }}
                 className="bg-background border rounded-3xl p-6 shadow-sm hover:shadow-xl transition-all relative overflow-hidden group cursor-default"
               >
-                <div className={`absolute top-0 right-0 w-24 h-24 bg-${feature.color}-500/10 rounded-bl-full -z-10 group-hover:scale-125 transition-transform duration-500`} />
-                <div className={`w-12 h-12 bg-${feature.color}-500/10 rounded-2xl flex items-center justify-center text-${feature.color}-600 mb-6 group-hover:scale-110 transition-transform`}>
+                <div className={`absolute top-0 right-0 w-24 h-24 rounded-bl-full -z-10 group-hover:scale-125 transition-transform duration-500 ${feature.glowClass}`} />
+                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform ${feature.iconClass}`}>
                   {feature.icon}
                 </div>
                 <h3 className="text-lg font-semibold mb-2">{feature.title}</h3>

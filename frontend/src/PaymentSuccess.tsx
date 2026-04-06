@@ -4,8 +4,7 @@ import { Button } from "./components/ui/button";
 import { CheckCircle2, Loader2, ArrowRight } from "lucide-react";
 import { auth } from "./firebase";
 import { motion } from "motion/react";
-
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+import { getApiBase } from "./lib/api";
 
 export default function PaymentSuccess() {
   const [status, setStatus] = useState<"loading" | "success" | "pending">("loading");
@@ -26,7 +25,7 @@ export default function PaymentSuccess() {
         if (!user) return;
 
         const token = await user.getIdToken();
-        const response = await fetch(`${API_URL}/api/payment/status`, {
+        const response = await fetch(`${getApiBase()}/api/payment/status`, {
           headers: {
             "Authorization": `Bearer ${token}`
           }

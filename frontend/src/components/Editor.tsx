@@ -15,6 +15,7 @@ import { db, auth } from "../firebase";
 import { doc, updateDoc, setDoc, serverTimestamp, collection } from "firebase/firestore";
 import Markdown from "react-markdown";
 import { PaywallModal } from "./PaywallModal";
+import { getApiBase } from "../lib/api";
 
 // ── Quick Actions ──────────────────────────────────────────────
 const QUICK_ACTIONS = [
@@ -70,6 +71,7 @@ interface EditorProps {
   post: Partial<Post> | null;
   userId: string;
   onPostUpdated: (post: Post) => void;
+  onStartNewPost: () => void;
   weeklyPostCount: number;
   weeklyGoal: number;
   postsToReview: Post[];
@@ -78,7 +80,7 @@ interface EditorProps {
 type EditorPhase = "select" | "input" | "result";
 
 // ── Component ──────────────────────────────────────────────────
-export function Editor({ post, userId, onPostUpdated, weeklyPostCount, weeklyGoal, postsToReview }: EditorProps) {
+export function Editor({ post, userId, onPostUpdated, onStartNewPost, weeklyPostCount, weeklyGoal, postsToReview }: EditorProps) {
   // Core state
   const [phase, setPhase] = useState<EditorPhase>("select");
   const [selectedAction, setSelectedAction] = useState<typeof QUICK_ACTIONS[0] | null>(null);
@@ -312,7 +314,7 @@ export function Editor({ post, userId, onPostUpdated, weeklyPostCount, weeklyGoa
     setShowAdvanced(false);
     setShowHistory(false);
     setIsEditing(false);
-    onPostUpdated({ id: undefined } as Post); // Signal parent to deselect
+    onStartNewPost();
   };
 
   // ── Weekly Progress Ring ───────────────────────────────────
@@ -326,8 +328,7 @@ export function Editor({ post, userId, onPostUpdated, weeklyPostCount, weeklyGoa
       const user = auth.currentUser;
       if (!user) return;
       const token = await user.getIdToken();
-      const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
-      await fetch(`${API_URL}/api/ai/voice-feedback`, {
+      await fetch(`${getApiBase()}/api/ai/voice-feedback`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ type, reason, content }),

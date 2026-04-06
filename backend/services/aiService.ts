@@ -1,13 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
-import path from "path";
-import { fileURLToPath } from "url";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-// Ensure env is loaded for this service
-dotenv.config({ path: path.resolve(__dirname, "../../backend/.env") });
+dotenv.config();
 
 const geminiApiKey = process.env.GEMINI_API_KEY;
 const pollinationsApiKey = process.env.POLLINATIONS_API_KEY;
@@ -72,7 +65,7 @@ export async function synthesizePost(
   let voiceInstructions = "";
   if (voiceProfile) {
     const parts: string[] = [];
-    
+
     // Direct corrections from 👎 feedback (strongest signals)
     if (voiceProfile.prefersCasual) {
       parts.push("IMPORTANT: Write CASUALLY. Sound like a college student sharing with friends, not a corporate exec. Use simple words and short sentences.");
@@ -83,7 +76,7 @@ export async function synthesizePost(
     if (voiceProfile.prefersStrongStance) {
       parts.push("IMPORTANT: Make the opinion LOUD and PROVOCATIVE. The reader should feel the author's conviction. Don't hedge or soften the stance.");
     }
-    
+
     // Automatic profile (kicks in after 2+ posts)
     if (voiceProfile.postsAnalyzed >= 2) {
       if (voiceProfile.avgSentenceLength === "short") {
@@ -103,7 +96,7 @@ export async function synthesizePost(
         parts.push("Include 1-2 rhetorical questions — the user's style includes them.");
       }
     }
-    
+
     if (parts.length > 0) {
       const postsInfo = voiceProfile.postsAnalyzed ? ` from ${voiceProfile.postsAnalyzed} posts + direct feedback` : " from direct feedback";
       voiceInstructions = `\n    VOICE PROFILE (learned${postsInfo} — STRICTLY match this style):\n    ${parts.join("\n    ")}`;
@@ -196,7 +189,7 @@ export async function iteratePost(currentContent: string, instruction: string): 
 export async function generateImage(prompt: string, size: "1K" | "2K" | "4K"): Promise<string> {
   let width = 1024;
   let height = 1024;
-  
+
   if (size === "2K") {
     width = 2048;
     height = 2048;

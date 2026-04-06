@@ -1,6 +1,5 @@
 import { auth } from "../firebase";
-
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+import { getApiBase } from "./api";
 
 async function getAuthHeaders() {
   const user = auth.currentUser;
@@ -20,7 +19,7 @@ export interface SynthesizeResult {
 
 export async function synthesizePost(topic: string, takeaway: string, audience: string, tone: string): Promise<SynthesizeResult> {
   const headers = await getAuthHeaders();
-  const response = await fetch(`${API_URL}/api/ai/synthesize`, {
+  const response = await fetch(`${getApiBase()}/api/ai/synthesize`, {
     method: "POST",
     headers,
     body: JSON.stringify({ topic, takeaway, audience, tone }),
@@ -49,7 +48,7 @@ export async function synthesizePost(topic: string, takeaway: string, audience: 
 
 export async function iteratePost(currentContent: string, instruction: string): Promise<string> {
   const headers = await getAuthHeaders();
-  const response = await fetch(`${API_URL}/api/ai/iterate`, {
+  const response = await fetch(`${getApiBase()}/api/ai/iterate`, {
     method: "POST",
     headers,
     body: JSON.stringify({ currentContent, instruction }),
@@ -74,7 +73,7 @@ export async function iteratePost(currentContent: string, instruction: string): 
 
 export async function generateImage(prompt: string, size: "1K" | "2K" | "4K"): Promise<string> {
   const headers = await getAuthHeaders();
-  const response = await fetch(`${API_URL}/api/ai/generate-image`, {
+  const response = await fetch(`${getApiBase()}/api/ai/generate-image`, {
     method: "POST",
     headers,
     body: JSON.stringify({ prompt, size }),

@@ -11,14 +11,10 @@ coverage/
 backend/.env
 frontend/.env
 frontend/.env.local
-admin/.env
 
-# Firebase JSON export
+# Firebase JSON export (use frontend/.env from .env.example instead)
 firebase-applet-config.json
-firebase-blueprint.json
 
 .idea/
 .vscode/
 *.swp
-.vercel
-.env*.local

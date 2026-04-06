@@ -15,14 +15,20 @@ import {
 } from "lucide-react";
 import { motion } from "motion/react";
 
-/** Backend URL for `/api/*`. */
+/** Backend URL for `/api/*`. When unset: same-origin on :3000 (tsx + Vite middleware); if the UI runs on another port (e.g. Vite :5173), use :3000 so we do not hit the SPA HTML. */
 function getApiBase(): string {
   const fromEnv = import.meta.env.VITE_API_URL;
   if (fromEnv) return String(fromEnv).replace(/\/$/, "");
 
-  // In development, if we're not on port 3000, we probably need to hit port 3000 for the API
-  if (import.meta.env.DEV) {
-    return `${window.location.protocol}//${window.location.hostname}:3000`;
+  if (typeof window === "undefined") return "";
+
+  const { hostname, port, protocol } = window.location;
+
+  if (port === "3000") return "";
+  if (!port || port === "80" || port === "443") return "";
+
+  if (import.meta.env.DEV && (hostname === "localhost" || hostname === "127.0.0.1")) {
+    return `${protocol}//${hostname}:3000`;
   }
 
   return "";
@@ -42,19 +48,27 @@ interface Stats {
   conversionRate: number;
 }
 
-interface User {
+interface UserPost {
+  id: string;
+  topic: string;
+  content: string;
+  createdAt: any;
+  performance: string | null;
+}
+
+interface UserData {
   uid: string;
   email: string;
   displayName: string;
   isPro: boolean;
-  planType: string;
-  createdAt: { _seconds: number; _nanoseconds: number } | string | any;
-  postsAnalyzed: number;
+  createdAt: any;
+  totalPosts: number;
+  recentPosts: UserPost[];
 }
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState<Stats | null>(null);
-  const [users, setUsers] = useState<User[]>([]);
+  const [userData, setUserData] = useState<UserData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
@@ -62,35 +76,67 @@ export default function AdminDashboard() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const currentUser = auth.currentUser;
-        if (!currentUser) {
+        const user = auth.currentUser;
+        if (!user) {
           navigate("/", { replace: true });
           return;
         }
 
-        const token = await currentUser.getIdToken();
-        const base = getApiBase();
+        const token = await user.getIdToken();
         
-        // Fetch Stats
-        const statsRes = await fetch(`${base}/api/admin/stats`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        
-        // Fetch Users
-        const usersRes = await fetch(`${base}/api/admin/users`, {
-          headers: { Authorization: `Bearer ${token}` },
+        // Fetch stats
+        const statsUrl = `${getApiBase()}/api/admin/stats`;
+        const statsResponse = await fetch(statsUrl, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
         });
 
-        if (!statsRes.ok || !usersRes.ok) {
-          const err = await statsRes.json().catch(() => ({ error: "Failed to fetch data" }));
-          throw new Error(err.error || "Access denied or server error.");
+        const statsRaw = await statsResponse.text();
+
+        if (statsRaw.trimStart().toLowerCase().startsWith("<!")) {
+          throw new Error(
+            "Got a web page instead of API data. Open http://localhost:3000 (or set VITE_API_URL=http://localhost:3000 in frontend/.env if you use Vite on another port)."
+          );
         }
 
-        const statsData = await statsRes.json();
-        const usersData = await usersRes.json();
+        let statsPayload: unknown;
+        try {
+          statsPayload = JSON.parse(statsRaw);
+        } catch {
+          throw new Error("Invalid response from server.");
+        }
 
-        setStats(statsData);
-        setUsers(usersData.users || []);
+        if (!statsResponse.ok) {
+          const err = statsPayload as { error?: string };
+          if (statsResponse.status === 403) {
+            throw new Error(err.error || "Access denied. You are not an admin.");
+          }
+          throw new Error(err.error || "Failed to fetch admin stats.");
+        }
+
+        setStats(statsPayload as Stats);
+
+        // Fetch user data
+        const userUrl = `${getApiBase()}/api/admin/user-data`;
+        const userResponse = await fetch(userUrl, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        const userRaw = await userResponse.text();
+        let userPayload: any;
+        try {
+          userPayload = JSON.parse(userRaw);
+        } catch {
+          console.error("Failed to parse user data");
+          return;
+        }
+
+        if (userResponse.ok && userPayload.users) {
+          setUserData(userPayload.users);
+        }
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : "Something went wrong.";
         setError(message);
@@ -179,148 +225,129 @@ export default function AdminDashboard() {
       </div>
 
       <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 bg-card border rounded-3xl p-6 shadow-sm space-y-6 overflow-hidden">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-bold">User Registry</h2>
-            <div className="text-xs font-medium text-muted-foreground px-2 py-1 bg-muted rounded-md tracking-tight uppercase">
-              Last 100 Joined
+        <div className="lg:col-span-2 bg-card border rounded-3xl p-6 shadow-sm space-y-6">
+          <h2 className="text-xl font-bold">Content Engine Usage</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="p-6 rounded-2xl bg-muted/40 border border-border/50 flex flex-col items-center text-center space-y-3">
+              <div className="h-12 w-12 bg-primary/10 text-primary rounded-xl flex items-center justify-center">
+                <Sparkles className="h-6 w-6" />
+              </div>
+              <div>
+                <p className="text-3xl font-bold">{stats.postGenerations}</p>
+                <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Posts Generated</p>
+              </div>
             </div>
-          </div>
-          
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="border-b border-border/50 text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                  <th className="pb-4 pt-1 font-semibold">User</th>
-                  <th className="pb-4 pt-1 font-semibold">Plan</th>
-                  <th className="pb-4 pt-1 font-semibold">Activity</th>
-                  <th className="pb-4 pt-1 font-semibold">Joined</th>
-                </tr>
-              </thead>
-              <tbody className="text-sm divide-y divide-border/30">
-                {users.map((u) => (
-                  <tr key={u.uid} className="group hover:bg-muted/30 transition-colors">
-                    <td className="py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-bold text-primary">
-                          {u.displayName.charAt(0)}
-                        </div>
-                        <div className="flex flex-col">
-                          <span className="font-semibold">{u.displayName}</span>
-                          <span className="text-xs text-muted-foreground truncate max-w-[150px]">{u.email}</span>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="py-4">
-                      {u.isPro ? (
-                        <span className="px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-bold uppercase tracking-tight border border-primary/20">
-                          {u.planType || "Pro"}
-                        </span>
-                      ) : (
-                        <span className="px-2 py-0.5 rounded-full bg-muted text-muted-foreground text-[10px] font-bold uppercase tracking-tight border border-border">
-                          Free
-                        </span>
-                      )}
-                    </td>
-                    <td className="py-4">
-                      <div className="flex items-center gap-1.5">
-                        <div className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                        <span className="text-xs font-medium">{u.postsAnalyzed} Posts</span>
-                      </div>
-                    </td>
-                    <td className="py-4 text-xs text-muted-foreground">
-                      {formatDate(u.createdAt)}
-                    </td>
-                  </tr>
-                ))}
-                {users.length === 0 && (
-                  <tr>
-                    <td colSpan={4} className="py-8 text-center text-muted-foreground">
-                      No users found.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+            <div className="p-6 rounded-2xl bg-muted/40 border border-border/50 flex flex-col items-center text-center space-y-3">
+              <div className="h-12 w-12 bg-emerald-500/10 text-emerald-600 rounded-xl flex items-center justify-center">
+                <ImageIcon className="h-6 w-6" />
+              </div>
+              <div>
+                <p className="text-3xl font-bold">{stats.imageGenerations}</p>
+                <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Images Generated</p>
+              </div>
+            </div>
           </div>
         </div>
 
-        <div className="bg-card border rounded-3xl p-6 shadow-sm space-y-6 h-fit">
-          <h2 className="text-xl font-bold">Content Engine Usage</h2>
+        <div className="bg-card border rounded-3xl p-6 shadow-sm space-y-6">
+          <h2 className="text-xl font-bold">Pricing Intent (Click-baits)</h2>
           <div className="space-y-4">
-            <div className="p-4 rounded-2xl bg-muted/40 border border-border/50 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 bg-primary/10 text-primary rounded-xl flex items-center justify-center">
-                  <Sparkles className="h-5 w-5" />
-                </div>
-                <span className="text-sm font-medium">Posts Generated</span>
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="font-medium">Pro Plan (₹99)</span>
+                <span className="font-bold">{stats.intents.pro} clicks</span>
               </div>
-              <span className="text-2xl font-bold">{stats.postGenerations}</span>
+              <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-primary"
+                  style={{
+                    width: `${stats.intents.total > 0 ? (stats.intents.pro / stats.intents.total) * 100 : 0}%`,
+                  }}
+                />
+              </div>
             </div>
-            <div className="p-4 rounded-2xl bg-muted/40 border border-border/50 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 bg-emerald-500/10 text-emerald-600 rounded-xl flex items-center justify-center">
-                  <ImageIcon className="h-5 w-5" />
-                </div>
-                <span className="text-sm font-medium">Images Generated</span>
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="font-medium">Student Plan (₹49)</span>
+                <span className="font-bold">{stats.intents.student} clicks</span>
               </div>
-              <span className="text-2xl font-bold">{stats.imageGenerations}</span>
+              <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-emerald-500"
+                  style={{
+                    width: `${stats.intents.total > 0 ? (stats.intents.student / stats.intents.total) * 100 : 0}%`,
+                  }}
+                />
+              </div>
             </div>
           </div>
+          <div className="p-4 rounded-2xl bg-primary/5 border border-primary/10">
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              <strong>Insights:</strong> Most users are clicking on the{" "}
+              {stats.intents.pro >= stats.intents.student ? "Pro" : "Student"} plan first. This represents your
+              potential market interest.
+            </p>
+          </div>
+        </div>
+      </div>
 
-          <div className="pt-4 border-t border-border/50 space-y-4">
-            <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Pricing Intent</h3>
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="font-medium text-xs">Pro Plan (₹99)</span>
-                  <span className="font-bold text-xs">{stats.intents.pro} clicks</span>
-                </div>
-                <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-primary"
-                    style={{
-                      width: `${stats.intents.total > 0 ? (stats.intents.pro / stats.intents.total) * 100 : 0}%`,
-                    }}
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="font-medium text-xs">Student Plan (₹49)</span>
-                  <span className="font-bold text-xs">{stats.intents.student} clicks</span>
-                </div>
-                <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-emerald-500"
-                    style={{
-                      width: `${stats.intents.total > 0 ? (stats.intents.student / stats.intents.total) * 100 : 0}%`,
-                    }}
-                  />
-                </div>
-              </div>
-            </div>
-            <div className="p-3 rounded-xl bg-primary/5 border border-primary/10">
-              <p className="text-[11px] text-muted-foreground leading-relaxed italic">
-                Insight: Potential market interest is leaning toward the{" "}
-                {stats.intents.pro >= stats.intents.student ? "Pro" : "Student"} plan.
-              </p>
-            </div>
-          </div>
+      <div className="max-w-7xl mx-auto bg-card border rounded-3xl p-6 shadow-sm space-y-6">
+        <h2 className="text-xl font-bold">Users & Content</h2>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-muted/50 border-b">
+              <tr>
+                <th className="px-4 py-3 text-left font-semibold text-muted-foreground">User</th>
+                <th className="px-4 py-3 text-left font-semibold text-muted-foreground">Email</th>
+                <th className="px-4 py-3 text-left font-semibold text-muted-foreground">Status</th>
+                <th className="px-4 py-3 text-left font-semibold text-muted-foreground">Posts</th>
+                <th className="px-4 py-3 text-left font-semibold text-muted-foreground">Recent Content</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y">
+              {userData.length > 0 ? (
+                userData.map((u) => (
+                  <tr key={u.uid} className="hover:bg-muted/30 transition-colors">
+                    <td className="px-4 py-4 font-medium">{u.displayName}</td>
+                    <td className="px-4 py-4 text-xs text-muted-foreground truncate max-w-xs">{u.email}</td>
+                    <td className="px-4 py-4">
+                      <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                        u.isPro 
+                          ? "bg-primary/10 text-primary" 
+                          : "bg-muted/50 text-muted-foreground"
+                      }`}>
+                        {u.isPro ? "Pro" : "Free"}
+                      </span>
+                    </td>
+                    <td className="px-4 py-4 font-bold">{u.totalPosts}</td>
+                    <td className="px-4 py-4">
+                      <div className="space-y-1 max-w-sm">
+                        {u.recentPosts.length > 0 ? (
+                          u.recentPosts.slice(0, 2).map((post) => (
+                            <div key={post.id} className="text-xs bg-muted/30 rounded px-2 py-1 line-clamp-1">
+                              <span className="font-medium">{post.topic}:</span> {post.content}
+                            </div>
+                          ))
+                        ) : (
+                          <span className="text-muted-foreground italic">No posts yet</span>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">
+                    No users found
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
   );
-}
-
-function formatDate(date: any): string {
-  if (!date) return "N/A";
-  try {
-    const d = date._seconds ? new Date(date._seconds * 1000) : new Date(date);
-    return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-  } catch {
-    return "N/A";
-  }
 }
 
 type MetricColor = "blue" | "emerald" | "primary" | "amber";

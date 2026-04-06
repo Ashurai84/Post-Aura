@@ -66,34 +66,4 @@ router.get("/stats", verifyFirebaseToken, async (req: AuthRequest, res) => {
   }
 });
 
-router.get("/users", verifyFirebaseToken, async (req: AuthRequest, res) => {
-  try {
-    const email = (req.user!.email || "").toLowerCase();
-    if (!ADMIN_EMAILS.includes(email)) {
-      return res.status(403).json({ error: "Access denied. Admin only." });
-    }
-
-    const db = getAdminDb();
-    const usersSnap = await db.collection("users").orderBy("createdAt", "desc").limit(100).get();
-    
-    const users = usersSnap.docs.map(doc => {
-      const data = doc.data();
-      return {
-        uid: doc.id,
-        email: data.email || "",
-        displayName: data.displayName || "Unknown",
-        isPro: !!data.isPro,
-        planType: data.planType || "free",
-        createdAt: data.createdAt,
-        postsAnalyzed: data.voiceProfile?.postsAnalyzed || 0
-      };
-    });
-
-    res.json({ users });
-  } catch (error: unknown) {
-    console.error("Users fetching failed:", error);
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
-
 export default router;

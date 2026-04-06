@@ -1,48 +1,24 @@
 import express from "express";
 import cors from "cors";
-import path from "path";
-import { fileURLToPath } from "url";
-import backendRoutes from "./routes";
 import dotenv from "dotenv";
+import backendRoutes from "./routes";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-dotenv.config({ path: path.resolve(__dirname, ".env") });
+dotenv.config({ path: "./backend/.env" });
 
 const app = express();
-const PORT = process.env.PORT || 3000;
-
-// CORS Configuration
-const allowedOrigins = [
-  "http://localhost:5173", // Default Vite Frontend
-  "http://localhost:5174", // Proposed standalone Admin
-  process.env.FRONTEND_URL,
-  process.env.ADMIN_URL,
-].filter(Boolean) as string[];
+const PORT = process.env.PORT || 8000;
 
 app.use(cors({
-  origin: (origin, callback) => {
-    // Allow requests with no origin (like mobile apps or curl)
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV !== "production") {
-      return callback(null, true);
-    }
-    return callback(new Error("CORS not allowed"), false);
-  },
-  credentials: true
+  origin: ["http://localhost:3000", "http://localhost:5173", "http://localhost:5174"],
 }));
-
 app.use(express.json());
 
-// API routes
 app.use("/api", backendRoutes);
 
-// Simple Health Check
-app.get("/health", (req, res) => res.json({ status: "ok", timestamp: new Date() }));
-
-app.listen(Number(PORT), "0.0.0.0", () => {
-  console.log(`[API] Server running on port ${PORT}`);
-  console.log(`[CORS] Whitelist:`, allowedOrigins.length ? allowedOrigins : "Open (Dev Mode)");
+app.get("/health", (req, res) => {
+  res.json({ status: "ok" });
 });
 
+app.listen(PORT, () => {
+  console.log(`PostAura backend running on http://localhost:${PORT}`);
+});

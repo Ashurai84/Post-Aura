@@ -1,7 +1,7 @@
 import express from "express";
 import * as aiService from "./services/aiService";
 import paymentRoutes from "./routes/payment";
-import adminRoutes from "../admin/server/routes";
+import adminRoutes from "./routes/admin";
 import { verifyFirebaseToken, AuthRequest } from "./middleware/auth";
 import { checkUsage } from "./middleware/checkUsage";
 import { getAdminDb, FieldValue } from "./services/firebaseAdmin";

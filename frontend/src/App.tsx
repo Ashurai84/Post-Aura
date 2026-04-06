@@ -7,6 +7,7 @@ import { Editor } from "./components/Editor";
 import { ImageGenerator } from "./components/ImageGenerator";
 import { LandingPage } from "./components/LandingPage";
 import PaymentSuccess from "./PaymentSuccess";
+import AdminDashboard from "@admin/AdminDashboard";
 import { Post } from "./types";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./components/ui/tabs";
 import { Loader2 } from "lucide-react";
@@ -154,6 +155,7 @@ export default function App() {
             setActivePostId={setActivePostId} 
           />
         ) : <Navigate to="/" />} />
+        <Route path="/admin" element={user ? <AdminDashboard /> : <Navigate to="/" />} />
         <Route path="/payment/success" element={<PaymentSuccess />} />
       </Routes>
     </BrowserRouter>

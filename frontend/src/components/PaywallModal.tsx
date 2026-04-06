@@ -3,8 +3,7 @@ import { Button } from "./ui/button";
 import { Check, Sparkles, Zap, GraduationCap, X, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { auth } from "../firebase";
-
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+import { getApiBase } from "../lib/api";
 
 interface PaywallModalProps {
   isOpen: boolean;
@@ -17,13 +16,14 @@ export function PaywallModal({ isOpen, onClose }: PaywallModalProps) {
 
   const handleUpgrade = async (plan: "student" | "pro") => {
     setIsOrdering(true);
+    const apiBase = getApiBase();
     
     // Log intent to backend (don't block the actual upgrade flow)
     try {
       const user = auth.currentUser;
       if (user) {
         const token = await user.getIdToken();
-        fetch(`${API_URL}/api/analytics/track-intent`, {
+        fetch(`${apiBase}/api/analytics/track-intent`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -41,7 +41,7 @@ export function PaywallModal({ isOpen, onClose }: PaywallModalProps) {
       if (!user) throw new Error("User not logged in");
       
       const token = await user.getIdToken();
-      const response = await fetch(`${API_URL}/api/payment/create-order`, {
+      const response = await fetch(`${apiBase}/api/payment/create-order`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
