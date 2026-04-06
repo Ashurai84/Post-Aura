@@ -9,7 +9,14 @@ const app = express();
 const PORT = process.env.PORT || 8000;
 
 app.use(cors({
-  origin: ["http://localhost:3000", "http://localhost:5173", "http://localhost:5174"],
+  origin: [
+    "http://localhost:3000", 
+    "http://localhost:5173", 
+    "http://localhost:5174",
+    "https://post-aura-frontend.netlify.app",
+    "https://post-aura-admin.netlify.app"
+  ],
+  credentials: true
 }));
 app.use(express.json());
 
