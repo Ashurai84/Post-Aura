@@ -93,7 +93,8 @@ router.post("/ai/synthesize", verifyFirebaseToken, checkUsage, async (req: AuthR
           "Gemini API quota exceeded. Check your Google AI plan and billing, or try again later.",
       });
     }
-    res.status(500).json({ error: error.message });
+    // Do not leak internal error details to clients in production
+    res.status(500).json({ error: "Internal server error. Please try again." });
   }
 });
 
@@ -111,7 +112,8 @@ router.post("/ai/iterate", verifyFirebaseToken, checkUsage, async (req, res) => 
           "Gemini API quota exceeded. Check your Google AI plan and billing, or try again later.",
       });
     }
-    res.status(500).json({ error: error.message });
+    // Do not leak internal error details to clients in production
+    res.status(500).json({ error: "Internal server error. Please try again." });
   }
 });
 
@@ -141,7 +143,8 @@ router.post("/ai/generate-image", verifyFirebaseToken, checkUsage, async (req: A
           "Gemini API quota exceeded. Check your Google AI plan and billing, or try again later.",
       });
     }
-    res.status(500).json({ error: error.message });
+    // Do not leak internal error details to clients in production
+    res.status(500).json({ error: "Internal server error. Please try again." });
   }
 });
 

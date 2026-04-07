@@ -70,7 +70,12 @@ export const signInWithGoogle = async () => {
 
     return user;
   } catch (error) {
-    console.error("Error signing in with Google", error);
+    // In production, avoid logging full error objects to the browser console
+    if (import.meta.env.DEV) {
+      console.error("Error signing in with Google", error);
+    } else {
+      console.error("Error signing in with Google");
+    }
     throw error;
   }
 };
@@ -79,7 +84,11 @@ export const logOut = async () => {
   try {
     await signOut(auth);
   } catch (error) {
-    console.error("Error signing out", error);
+    if (import.meta.env.DEV) {
+      console.error("Error signing out", error);
+    } else {
+      console.error("Error signing out");
+    }
     throw error;
   }
 };

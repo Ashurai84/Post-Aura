@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { motion } from "motion/react";
 import { Button } from "./ui/button";
 import { 
@@ -39,6 +40,30 @@ const FEATURES = [
 ];
 
 export function LandingPage() {
+  const [isSigningIn, setIsSigningIn] = useState(false);
+
+  const handleSignIn = async () => {
+    if (isSigningIn) return; // prevent multiple concurrent popups
+    setIsSigningIn(true);
+    try {
+      await signInWithGoogle();
+    } catch (err: any) {
+      const code = err?.code as string | undefined;
+
+      // Silent for common user actions
+      if (code === "auth/popup-closed-by-user" || code === "auth/cancelled-popup-request") {
+        // User closed the popup or another sign-in was in progress
+      } else if (code === "auth/unauthorized-domain") {
+        // Show a generic message without exposing Firebase config details
+        alert("Sign-in is not available from this domain right now. Please try again later.");
+      } else {
+        alert("Sign-in failed. Please try again.");
+      }
+    } finally {
+      setIsSigningIn(false);
+    }
+  };
+
   const fadeUp = {
     hidden: { opacity: 0, y: 40 },
     visible: { opacity: 1, y: 0, transition: { duration: 0.8, ease: [0.16, 1, 0.3, 1] as any } }
@@ -73,8 +98,13 @@ export function LandingPage() {
             </div>
             <span className="font-bold text-lg tracking-tight">PostAura</span>
           </div>
-          <Button onClick={signInWithGoogle} variant="default" className="rounded-full px-6 shadow-sm hover:shadow-md transition-all">
-            Sign In
+          <Button
+            onClick={handleSignIn}
+            disabled={isSigningIn}
+            variant="default"
+            className="rounded-full px-6 shadow-sm hover:shadow-md transition-all"
+          >
+            {isSigningIn ? "Signing in..." : "Sign In"}
           </Button>
         </div>
       </nav>
@@ -100,8 +130,13 @@ export function LandingPage() {
             </motion.p>
             
             <motion.div variants={fadeUp} className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-8">
-              <Button onClick={signInWithGoogle} size="lg" className="rounded-full px-8 h-14 text-base shadow-xl shadow-primary/20 hover:scale-105 hover:shadow-primary/30 transition-all duration-300">
-                Start Writing for Free <ArrowRight className="ml-2 h-5 w-5" />
+              <Button
+                onClick={handleSignIn}
+                disabled={isSigningIn}
+                size="lg"
+                className="rounded-full px-8 h-14 text-base shadow-xl shadow-primary/20 hover:scale-105 hover:shadow-primary/30 transition-all duration-300"
+              >
+                {isSigningIn ? "Signing in..." : "Start Writing for Free"} <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
             </motion.div>
           </motion.div>
