@@ -12,6 +12,7 @@ import {
   ArrowLeft,
   Loader2,
   AlertCircle,
+  Trash2,
 } from "lucide-react";
 import { motion } from "motion/react";
 
@@ -147,6 +148,25 @@ export default function AdminDashboard() {
 
     fetchData();
   }, [navigate]);
+
+  const handleDeleteUser = async (userId: string) => {
+    if (!window.confirm("Are you sure you want to completely remove this user and all their data? This action cannot be undone.")) return;
+    try {
+      const user = auth.currentUser;
+      if (!user) return;
+      const token = await user.getIdToken();
+      const res = await fetch(`${getApiBase()}/api/admin/users/${userId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!res.ok) throw new Error("Failed to delete user");
+      
+      setUserData(prev => prev.filter(u => u.uid !== userId));
+      setStats(prev => prev ? { ...prev, totalUsers: prev.totalUsers - 1 } : null);
+    } catch (err: unknown) {
+      alert("Error deleting user: " + (err instanceof Error ? err.message : String(err)));
+    }
+  };
 
   if (loading) {
     return (
@@ -302,6 +322,7 @@ export default function AdminDashboard() {
                 <th className="px-4 py-3 text-left font-semibold text-muted-foreground">Status</th>
                 <th className="px-4 py-3 text-left font-semibold text-muted-foreground">Posts</th>
                 <th className="px-4 py-3 text-left font-semibold text-muted-foreground">Recent Content</th>
+                <th className="px-4 py-3 text-right font-semibold text-muted-foreground">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y">
@@ -338,11 +359,21 @@ export default function AdminDashboard() {
                         )}
                       </div>
                     </td>
+                    <td className="px-4 py-4 text-right">
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="text-rose-500 hover:text-rose-600 hover:bg-rose-500/10"
+                        onClick={() => handleDeleteUser(u.uid)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">
+                  <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
                     No users found
                   </td>
                 </tr>

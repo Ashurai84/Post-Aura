@@ -1,6 +1,6 @@
 import express from "express";
 import { verifyFirebaseToken, AuthRequest } from "../middleware/auth";
-import { getAdminDb } from "../services/firebaseAdmin";
+import { getAdminDb, getAdminAuth } from "../services/firebaseAdmin";
 
 const router = express.Router();
 
@@ -104,7 +104,6 @@ router.get("/users/:userId/posts", async (req: AuthRequest, res) => {
     const postsSnap = await db
       .collection("posts")
       .where("userId", "==", userId)
-      .orderBy("createdAt", "desc")
       .get();
 
     const posts = postsSnap.docs.map((doc) => {
@@ -120,6 +119,10 @@ router.get("/users/:userId/posts", async (req: AuthRequest, res) => {
         copiedAt: data.copiedAt || null,
         performance: data.performance || null,
       };
+    }).sort((a, b) => {
+      const timeA = a.createdAt?.toMillis?.() || a.createdAt?._seconds || 0;
+      const timeB = b.createdAt?.toMillis?.() || b.createdAt?._seconds || 0;
+      return timeB - timeA;
     });
 
     res.json({ userId, postCount: posts.length, posts });
@@ -139,8 +142,6 @@ router.get("/user-data", async (_req: AuthRequest, res) => {
         const userData = userDoc.data();
         const postsSnap = await db.collection("posts")
           .where("userId", "==", userDoc.id)
-          .orderBy("createdAt", "desc")
-          .limit(10)
           .get();
 
         const posts = postsSnap.docs.map((doc) => {
@@ -152,7 +153,11 @@ router.get("/user-data", async (_req: AuthRequest, res) => {
             createdAt: data.createdAt,
             performance: data.performance || null,
           };
-        });
+        }).sort((a, b) => {
+          const timeA = a.createdAt?.toMillis?.() || a.createdAt?._seconds || 0;
+          const timeB = b.createdAt?.toMillis?.() || b.createdAt?._seconds || 0;
+          return timeB - timeA;
+        }).slice(0, 10);
 
         return {
           uid: userDoc.id,
@@ -170,6 +175,35 @@ router.get("/user-data", async (_req: AuthRequest, res) => {
   } catch (error: unknown) {
     console.error("User data fetching failed:", error);
     res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.delete("/users/:userId", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.params.userId as string;
+    const db = getAdminDb();
+    
+    // 1. Delete user doc
+    await db.collection("users").doc(userId).delete().catch(console.warn);
+
+    // 2. Delete posts
+    const postsSnap = await db.collection("posts").where("userId", "==", userId).get();
+    const batch = db.batch();
+    postsSnap.docs.forEach(doc => batch.delete(doc.ref));
+    await batch.commit().catch(console.warn);
+
+    // 3. Delete from Firebase Auth
+    try {
+      const auth = getAdminAuth();
+      await auth.deleteUser(userId);
+    } catch (authError) {
+      console.warn("Failed to delete user from Firebase Auth:", authError);
+    }
+
+    res.json({ success: true, message: `User ${userId} completely deleted` });
+  } catch (error: unknown) {
+    console.error("User deletion failed:", error);
+    res.status(500).json({ error: "Failed to delete user" });
   }
 });
 
