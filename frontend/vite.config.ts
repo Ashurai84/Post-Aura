@@ -8,10 +8,13 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const repoRoot = path.resolve(__dirname, '..');
 
-export default defineConfig(() => {
+export default defineConfig(({ command }) => {
   return {
     root: path.resolve(__dirname, '.'),
     plugins: [react(), tailwindcss()],
+    esbuild: {
+      drop: command === 'build' ? ['console', 'debugger'] : [],
+    },
     // Do not inject GEMINI_API_KEY or other secrets here — they would ship in the browser bundle.
     resolve: {
       alias: {

@@ -1,6 +1,6 @@
 import { initializeApp, type FirebaseOptions } from "firebase/app";
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut } from "firebase/auth";
-import { getFirestore, doc, setDoc, getDoc, serverTimestamp } from "firebase/firestore";
+import { getFirestore, doc, setDoc, getDoc, serverTimestamp, setLogLevel } from "firebase/firestore";
 import { getAnalytics, isSupported } from "firebase/analytics";
 
 function getFirebaseWebConfig(): FirebaseOptions {
@@ -38,6 +38,10 @@ const firestoreDbId = import.meta.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID || "(d
 export const db = getFirestore(app, firestoreDbId);
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
+
+if (!import.meta.env.DEV) {
+  setLogLevel("silent");
+}
 
 if (typeof window !== "undefined" && import.meta.env.VITE_FIREBASE_MEASUREMENT_ID) {
   isSupported().then((ok) => {

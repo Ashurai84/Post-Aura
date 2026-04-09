@@ -326,6 +326,11 @@ export default function AdminDashboard() {
                           u.recentPosts.slice(0, 2).map((post) => (
                             <div key={post.id} className="text-xs bg-muted/30 rounded px-2 py-1 line-clamp-1">
                               <span className="font-medium">{post.topic}:</span> {post.content}
+                              {post.performance && (
+                                <span className={`ml-2 px-1.5 py-0.5 rounded-full text-[10px] font-bold ${post.performance === 'hot' ? 'bg-emerald-500/20 text-emerald-600' : post.performance === 'flopped' ? 'bg-rose-500/20 text-rose-600' : 'bg-muted-foreground/20 text-muted-foreground'}`}>
+                                  {post.performance === 'hot' ? '🔥' : post.performance === 'flopped' ? '👎' : '👍'}
+                                </span>
+                              )}
                             </div>
                           ))
                         ) : (

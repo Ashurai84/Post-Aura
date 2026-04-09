@@ -102,9 +102,8 @@ router.get("/users/:userId/posts", async (req: AuthRequest, res) => {
     const db = getAdminDb();
 
     const postsSnap = await db
-      .collection("users")
-      .doc(userId as string)
       .collection("posts")
+      .where("userId", "==", userId)
       .orderBy("createdAt", "desc")
       .get();
 
@@ -138,8 +137,8 @@ router.get("/user-data", async (_req: AuthRequest, res) => {
     const usersWithPosts = await Promise.all(
       usersSnap.docs.map(async (userDoc) => {
         const userData = userDoc.data();
-        const postsSnap = await userDoc.ref
-          .collection("posts")
+        const postsSnap = await db.collection("posts")
+          .where("userId", "==", userDoc.id)
           .orderBy("createdAt", "desc")
           .limit(10)
           .get();

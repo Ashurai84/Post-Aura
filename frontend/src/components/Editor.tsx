@@ -108,6 +108,7 @@ export function Editor({ post, userId, onPostUpdated, onStartNewPost, weeklyPost
   const [showFeedbackOptions, setShowFeedbackOptions] = useState(false);
   const [voiceTags, setVoiceTags] = useState<string[]>([]);
   const [postsAnalyzed, setPostsAnalyzed] = useState(0);
+  const [reviewMessage, setReviewMessage] = useState<string | null>(null);
 
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -296,6 +297,8 @@ export function Editor({ post, userId, onPostUpdated, onStartNewPost, weeklyPost
     try {
       const postRef = doc(db, "posts", postId);
       await updateDoc(postRef, { performance: rating });
+      setReviewMessage("Review submitted! Thank you.");
+      setTimeout(() => setReviewMessage(null), 3000);
     } catch (error) {
       console.error("Performance review error:", error);
     }
@@ -390,7 +393,7 @@ export function Editor({ post, userId, onPostUpdated, onStartNewPost, weeklyPost
                 <div key={reviewPost.id} className="bg-gradient-to-r from-amber-500/8 to-orange-500/5 border border-amber-500/20 rounded-xl p-4 animate-in fade-in slide-in-from-top-2 duration-300">
                   <p className="text-sm font-semibold mb-1">How did this post perform?</p>
                   <p className="text-xs text-muted-foreground mb-3 line-clamp-2 italic">
-                    "{reviewPost.content.slice(0, 100).replace(/\n/g, ' ')}…"
+                    "{reviewPost.content.replace(/\*/g, '').slice(0, 100).replace(/\n/g, ' ')}…"
                   </p>
                   <div className="flex gap-2">
                     <button
@@ -414,6 +417,13 @@ export function Editor({ post, userId, onPostUpdated, onStartNewPost, weeklyPost
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+
+          {reviewMessage && (
+            <div className="bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400 p-3 rounded-xl border border-emerald-200 dark:border-emerald-500/20 text-sm font-medium animate-in fade-in slide-in-from-top-2 flex items-center gap-2">
+              <Check className="h-4 w-4" />
+              {reviewMessage}
             </div>
           )}
 

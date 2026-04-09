@@ -50,6 +50,7 @@ async function callWithRetryAndFallback(
   throw new Error("All Gemini models failed after retries. Please try again later.");
 }
 
+
 export async function synthesizePost(
   topic: string,
   takeaway: string,
@@ -186,9 +187,13 @@ export async function iteratePost(currentContent: string, instruction: string): 
   });
 }
 
+
+
 export async function generateImage(prompt: string, size: "1K" | "2K" | "4K"): Promise<string> {
   let width = 1024;
   let height = 1024;
+
+
 
   if (size === "2K") {
     width = 2048;
