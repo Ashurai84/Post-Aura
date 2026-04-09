@@ -502,6 +502,20 @@ The admin dashboard tracks:
 
 ---
 
+## ☕ Support This Project
+
+Love Post-Aura? Support the development! 
+
+[![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-FFDD00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/ashurai_84)
+
+Your support helps us:
+- Ship new features faster
+- Keep servers running
+- Improve the AI models
+- Build a better product
+
+---
+
 ## 🤝 Contributing
 
 We welcome contributions! Please:
