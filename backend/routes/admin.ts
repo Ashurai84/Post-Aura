@@ -74,7 +74,7 @@ router.get("/stats", async (_req: AuthRequest, res) => {
 router.get("/users", async (_req: AuthRequest, res) => {
   try {
     const db = getAdminDb();
-    const usersSnap = await db.collection("users").orderBy("createdAt", "desc").limit(100).get();
+    const usersSnap = await db.collection("users").get();
 
     const users = usersSnap.docs.map((doc) => {
       const data = doc.data();
@@ -87,7 +87,11 @@ router.get("/users", async (_req: AuthRequest, res) => {
         createdAt: data.createdAt,
         postsAnalyzed: data.voiceProfile?.postsAnalyzed || 0,
       };
-    });
+    }).sort((a, b) => {
+      const timeA = a.createdAt?.toMillis?.() || a.createdAt?._seconds || 0;
+      const timeB = b.createdAt?.toMillis?.() || b.createdAt?._seconds || 0;
+      return timeB - timeA;
+    }).slice(0, 100);
 
     res.json({ users });
   } catch (error: unknown) {
@@ -135,10 +139,17 @@ router.get("/users/:userId/posts", async (req: AuthRequest, res) => {
 router.get("/user-data", async (_req: AuthRequest, res) => {
   try {
     const db = getAdminDb();
-    const usersSnap = await db.collection("users").orderBy("createdAt", "desc").limit(50).get();
+    const usersSnap = await db.collection("users").get();
+    
+    // Sort and limit users first
+    const sortedUserDocs = usersSnap.docs.slice().sort((a, b) => {
+      const timeA = a.data().createdAt?.toMillis?.() || a.data().createdAt?._seconds || 0;
+      const timeB = b.data().createdAt?.toMillis?.() || b.data().createdAt?._seconds || 0;
+      return timeB - timeA;
+    }).slice(0, 50);
 
     const usersWithPosts = await Promise.all(
-      usersSnap.docs.map(async (userDoc) => {
+      sortedUserDocs.map(async (userDoc) => {
         const userData = userDoc.data();
         const postsSnap = await db.collection("posts")
           .where("userId", "==", userDoc.id)
