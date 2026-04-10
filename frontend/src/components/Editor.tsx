@@ -281,7 +281,9 @@ export function Editor({ post, userId, onPostUpdated, onStartNewPost, weeklyPost
   };
 
   const copyToClipboard = () => {
-    navigator.clipboard.writeText(content);
+    // Strip markdown asterisks (**) for clean pasting to LinkedIn
+    const cleanContent = content.replace(/\*\*/g, '');
+    navigator.clipboard.writeText(cleanContent);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
 
@@ -430,6 +432,14 @@ export function Editor({ post, userId, onPostUpdated, onStartNewPost, weeklyPost
           {/* ═══════ PHASE: SELECT ═══════ */}
           {phase === "select" && (
             <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              {post?.id && (
+                <button
+                  onClick={handleStartNew}
+                  className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
+                >
+                  ← Clear selection & start a new post
+                </button>
+              )}
               <div className="text-center space-y-2 pt-4">
                 <h2 className="text-2xl md:text-3xl font-bold tracking-tight">
                   What did you do today?
@@ -579,6 +589,21 @@ export function Editor({ post, userId, onPostUpdated, onStartNewPost, weeklyPost
           {/* ═══════ PHASE: RESULT ═══════ */}
           {phase === "result" && content && (
             <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+
+              <div className="flex items-center justify-between">
+                <button
+                  onClick={() => setPhase("select")}
+                  className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
+                >
+                  ← Back to templates
+                </button>
+                <button
+                  onClick={handleStartNew}
+                  className="text-xs text-muted-foreground hover:text-primary transition-colors flex items-center gap-1"
+                >
+                  + Start a new post
+                </button>
+              </div>
 
               {/* ── Post Card ─────────────────────────────── */}
               <div className="rounded-2xl border-2 border-border/60 bg-card shadow-xl shadow-black/5 overflow-hidden">
