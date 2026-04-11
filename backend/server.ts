@@ -3,7 +3,7 @@ import cors from "cors";
 import dotenv from "dotenv";
 import backendRoutes from "./routes";
 
-dotenv.config({ path: "./backend/.env" });
+dotenv.config({ path: "./.env" });
 
 const app = express();
 const PORT = process.env.PORT || 8000;
@@ -22,10 +22,16 @@ app.use(express.json());
 
 app.use("/api", backendRoutes);
 
+import { connectDB } from "./config/db";
+
 app.get("/health", (req, res) => {
   res.json({ status: "ok" });
 });
 
-app.listen(PORT, () => {
-  console.log(`PostAura backend running on http://localhost:${PORT}`);
-});
+connectDB().then(() => {
+  app.listen(PORT, () => {
+    console.log(`PostAura backend running on http://localhost:${PORT}`);
+  });
+}).catch(console.error);
+
+
