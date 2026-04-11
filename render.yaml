@@ -3,10 +3,12 @@ services:
     name: postaura-backend
     env: node
     rootDir: backend
-    buildCommand: npm install
+    buildCommand: npm install && npm run build
     startCommand: npm run start
     healthCheckPath: /health
     envVars:
+      - key: MONGODB_URI
+        sync: false
       - key: GEMINI_API_KEY
         sync: false
       - key: POLLINATIONS_API_KEY

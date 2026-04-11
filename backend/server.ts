@@ -1,9 +1,10 @@
-import express from "express";
-import cors from "cors";
-import dotenv from "dotenv";
-import backendRoutes from "./routes";
+import express from 'express';
+import cors from 'cors';
+import dotenv from 'dotenv';
+import backendRoutes from './routes';
+import { connectDB } from './config/db';
 
-dotenv.config({ path: "./.env" });
+dotenv.config({ path: './.env' });
 
 const app = express();
 const PORT = process.env.PORT || 8000;
@@ -22,16 +23,15 @@ app.use(express.json());
 
 app.use("/api", backendRoutes);
 
-import { connectDB } from "./config/db";
-
-app.get("/health", (req, res) => {
-  res.json({ status: "ok" });
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok' });
 });
 
 connectDB().then(() => {
   app.listen(PORT, () => {
-    console.log(`PostAura backend running on http://localhost:${PORT}`);
+    console.log(`[PostAura] Backend running on http://localhost:${PORT}`);
   });
-}).catch(console.error);
-
-
+}).catch((err) => {
+  console.error('[PostAura] Failed to start server:', err);
+  process.exit(1);
+});
