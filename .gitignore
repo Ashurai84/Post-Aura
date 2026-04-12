@@ -33,3 +33,4 @@ npm-debug.log*
 
 # Test coverage
 coverage/
+docs/firebase-applet-config.json
