@@ -1,5 +1,5 @@
 import { initializeApp, type FirebaseOptions } from "firebase/app";
-import { getAuth, GoogleAuthProvider, signInWithPopup, signOut } from "firebase/auth";
+import { getAuth, GoogleAuthProvider, signInWithRedirect, getRedirectResult, signOut } from "firebase/auth";
 import { getFirestore, doc, setDoc, getDoc, serverTimestamp, setLogLevel } from "firebase/firestore";
 import { getAnalytics, isSupported } from "firebase/analytics";
 
@@ -51,7 +51,21 @@ if (typeof window !== "undefined" && import.meta.env.VITE_FIREBASE_MEASUREMENT_I
 
 export const signInWithGoogle = async () => {
   try {
-    const result = await signInWithPopup(auth, googleProvider);
+    await signInWithRedirect(auth, googleProvider);
+  } catch (error) {
+    if (import.meta.env.DEV) {
+      console.error("Error signing in with Google", error);
+    } else {
+      console.error("Error signing in with Google");
+    }
+    throw error;
+  }
+};
+
+export const handleRedirectResult = async () => {
+  try {
+    const result = await getRedirectResult(auth);
+    if (!result) return null;
     const user = result.user;
 
     const userRef = doc(db, "users", user.uid);
@@ -74,11 +88,10 @@ export const signInWithGoogle = async () => {
 
     return user;
   } catch (error) {
-    // In production, avoid logging full error objects to the browser console
     if (import.meta.env.DEV) {
-      console.error("Error signing in with Google", error);
+      console.error("Error handling redirect result", error);
     } else {
-      console.error("Error signing in with Google");
+      console.error("Error handling redirect result");
     }
     throw error;
   }
