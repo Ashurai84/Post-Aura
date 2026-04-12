@@ -8,7 +8,6 @@ import { ImageGenerator } from "./components/ImageGenerator";
 import { LandingPage } from "./components/LandingPage";
 import { LoginPage } from "./components/LoginPage";
 import PaymentSuccess from "./PaymentSuccess";
-import { AdminDashboard } from "./components/AdminDashboard";
 import { Post } from "./types";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./components/ui/tabs";
 import { Loader2 } from "lucide-react";
@@ -46,6 +45,7 @@ function Dashboard({ user, posts, activePostId, setActivePostId }: {
   const activePost = posts.find(p => p.id === activePostId) || null;
   const weekStart = getStartOfWeek();
   const weeklyPostCount = posts.filter(p => timestampToMs(p.createdAt) >= weekStart).length;
+  const remainingThisWeek = Math.max(WEEKLY_GOAL - weeklyPostCount, 0);
 
   // Posts copied 24h+ ago without a performance review
   const now = Date.now();
@@ -57,7 +57,7 @@ function Dashboard({ user, posts, activePostId, setActivePostId }: {
   });
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-background">
+    <div className="flex h-screen w-screen overflow-hidden bg-[radial-gradient(circle_at_top_left,_rgba(79,70,229,0.08),_transparent_25%),radial-gradient(circle_at_bottom_right,_rgba(251,146,60,0.08),_transparent_25%),hsl(var(--background))]">
       <Sidebar 
         posts={posts} 
         activePostId={activePostId} 
@@ -68,8 +68,18 @@ function Dashboard({ user, posts, activePostId, setActivePostId }: {
       
       <main className="flex-1 flex flex-col h-screen overflow-hidden">
         <Tabs defaultValue="editor" className="flex-1 flex flex-col h-full">
-          <div className="border-b px-6 py-3 flex items-center justify-between bg-muted/10">
-            <TabsList>
+          <div className="border-b border-border/60 px-6 py-4 flex items-center justify-between bg-background/75 backdrop-blur-xl">
+            <div className="space-y-1">
+              <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground font-semibold">Daily Momentum</p>
+              <h1 className="text-lg md:text-2xl font-semibold tracking-tight">Don&apos;t fall behind. What did you do today?</h1>
+              <p className="text-sm text-muted-foreground">
+                {remainingThisWeek === 0
+                  ? "You crushed this week. Keep posting while momentum is hot."
+                  : `${remainingThisWeek} more post${remainingThisWeek > 1 ? "s" : ""} to hit your weekly target.`}
+              </p>
+            </div>
+
+            <TabsList className="shadow-sm border border-border/60 bg-card/80">
               <TabsTrigger value="editor">Editor</TabsTrigger>
               <TabsTrigger value="images">Images</TabsTrigger>
             </TabsList>
@@ -105,6 +115,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [posts, setPosts] = useState<Post[]>([]);
   const [activePostId, setActivePostId] = useState<string | null>(null);
+  const isAuthenticated = !!user || !!auth.currentUser;
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -148,18 +159,18 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={user ? <Navigate to="/dashboard" /> : <LandingPage />} />
-        <Route path="/login" element={user ? <Navigate to="/dashboard" /> : <LoginPage />} />
-        <Route path="/dashboard" element={user ? (
+        <Route path="/" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <LandingPage />} />
+        <Route path="/login" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <LoginPage />} />
+        <Route path="/dashboard" element={isAuthenticated ? (
           <Dashboard 
             user={user} 
             posts={posts} 
             activePostId={activePostId} 
             setActivePostId={setActivePostId} 
           />
-        ) : <Navigate to="/" />} />
+        ) : <Navigate to="/" replace />} />
         <Route path="/payment/success" element={<PaymentSuccess />} />
-        <Route path="/admin" element={<AdminDashboard />} />
+        <Route path="/admin" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
   );

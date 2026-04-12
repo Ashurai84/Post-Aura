@@ -324,8 +324,16 @@ export function Editor({ post, userId, onPostUpdated, onStartNewPost, weeklyPost
 
   // ── Weekly Progress Ring ───────────────────────────────────
   const progressPercent = Math.min((weeklyPostCount / weeklyGoal) * 100, 100);
+  const progressLeft = Math.max(weeklyGoal - weeklyPostCount, 0);
   const circumference = 2 * Math.PI * 18;
   const strokeDashoffset = circumference - (progressPercent / 100) * circumference;
+
+  const postLines = content.split("\n");
+  const firstNonEmptyIndex = postLines.findIndex((line) => line.trim().length > 0);
+  const hookLine = firstNonEmptyIndex >= 0 ? postLines[firstNonEmptyIndex].replace(/\*\*/g, "").trim() : "";
+  const bodyMarkdown = firstNonEmptyIndex >= 0
+    ? [...postLines.slice(0, firstNonEmptyIndex), ...postLines.slice(firstNonEmptyIndex + 1)].join("\n")
+    : content;
 
   // ── Send voice feedback to backend ─────────────────────────
   const sendVoiceFeedback = async (type: "approved" | "rejected", reason: string | null) => {
@@ -345,14 +353,14 @@ export function Editor({ post, userId, onPostUpdated, onStartNewPost, weeklyPost
 
   // ── RENDER ─────────────────────────────────────────────────
   return (
-    <div className="flex-1 flex flex-col h-full overflow-hidden bg-background">
+    <div className="flex-1 flex flex-col h-full overflow-hidden bg-[radial-gradient(circle_at_top,_rgba(79,70,229,0.08),_transparent_35%),hsl(var(--background))] transition-colors">
       <div className="flex-1 overflow-y-auto">
-        <div className="max-w-2xl mx-auto w-full px-4 py-6 md:px-6 md:py-10 space-y-8">
+        <div className="max-w-3xl mx-auto w-full px-4 py-6 md:px-8 md:py-10 space-y-10">
 
           {/* ── Weekly Progress ─────────────────────────── */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="relative w-12 h-12">
+          <div className="premium-panel rounded-2xl p-5 md:p-6 flex items-start justify-between gap-5 animate-in fade-in duration-500">
+            <div className="flex items-start gap-4">
+              <div className="relative w-14 h-14 mt-0.5">
                 <svg className="w-12 h-12 -rotate-90" viewBox="0 0 40 40">
                   <circle cx="20" cy="20" r="18" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-muted/40" />
                   <circle
@@ -363,25 +371,29 @@ export function Editor({ post, userId, onPostUpdated, onStartNewPost, weeklyPost
                     style={{ transition: "stroke-dashoffset 0.6s ease" }}
                   />
                 </svg>
-                <span className="absolute inset-0 flex items-center justify-center text-xs font-bold">
+                <span className="absolute inset-0 flex items-center justify-center text-[11px] font-bold">
                   {weeklyPostCount >= weeklyGoal ? "🎉" : `${weeklyPostCount}/${weeklyGoal}`}
                 </span>
               </div>
-              <div>
+              <div className="space-y-1.5">
+                <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground font-semibold">Weekly Momentum</p>
+                <h2 className="text-lg md:text-2xl font-semibold tracking-tight">
+                  Don&apos;t fall behind. What did you do today?
+                </h2>
                 <p className="text-sm font-semibold">
                   {weeklyPostCount >= weeklyGoal
                     ? "Weekly goal hit! 🔥"
-                    : `${weeklyGoal - weeklyPostCount} more to hit your goal`}
+                    : `${progressLeft} more to hit your goal`}
                 </p>
                 <p className="text-xs text-muted-foreground">
                   {weeklyPostCount >= weeklyGoal
                     ? "You're outpacing most LinkedIn users"
-                    : "Don't fall behind your peers"}
+                    : "Keep the streak alive while your audience is paying attention."}
                 </p>
               </div>
             </div>
             {weeklyPostCount > 0 && weeklyPostCount < weeklyGoal && (
-              <div className="flex items-center gap-1 text-xs font-medium text-amber-600 bg-amber-50 dark:bg-amber-500/10 px-3 py-1.5 rounded-full border border-amber-200 dark:border-amber-500/20">
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-700 bg-amber-50 dark:bg-amber-500/10 px-3.5 py-2 rounded-full border border-amber-200 dark:border-amber-500/20 shadow-sm whitespace-nowrap">
                 <Flame className="h-3 w-3" />
                 Keep going
               </div>
@@ -440,30 +452,30 @@ export function Editor({ post, userId, onPostUpdated, onStartNewPost, weeklyPost
                   ← Clear selection & start a new post
                 </button>
               )}
-              <div className="text-center space-y-2 pt-4">
-                <h2 className="text-2xl md:text-3xl font-bold tracking-tight">
+              <div className="text-center space-y-2 pt-2">
+                <h2 className="text-3xl md:text-4xl font-bold tracking-tight">
                   What did you do today?
                 </h2>
-                <p className="text-muted-foreground text-sm">
-                  Tap one. We'll handle the rest.
+                <p className="text-muted-foreground text-sm md:text-base">
+                  Pick the moment. PostAura turns it into a post people actually read.
                 </p>
               </div>
 
-              <div className="grid gap-3">
+              <div className="grid gap-4">
                 {QUICK_ACTIONS.map((action) => (
                   <button
                     key={action.id}
                     onClick={() => handleSelectAction(action)}
-                    className="group flex items-center gap-4 p-4 rounded-2xl border bg-card hover:bg-primary/5 hover:border-primary/30 transition-all duration-200 text-left active:scale-[0.98]"
+                    className="premium-action-card group flex items-center gap-4 p-5 rounded-2xl text-left active:scale-[0.99]"
                   >
-                    <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary group-hover:bg-primary/15 transition-colors shrink-0">
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary/15 via-primary/10 to-transparent flex items-center justify-center text-primary group-hover:scale-110 transition-all shrink-0">
                       {action.icon}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-sm">{action.label}</p>
-                      <p className="text-xs text-muted-foreground truncate mt-0.5">{action.placeholder}</p>
+                      <p className="font-semibold text-base tracking-tight">{action.label}</p>
+                      <p className="text-xs text-muted-foreground truncate mt-1">{action.placeholder}</p>
                     </div>
-                    <ArrowRight className="h-4 w-4 text-muted-foreground/50 group-hover:text-primary group-hover:translate-x-0.5 transition-all shrink-0" />
+                    <ArrowRight className="h-4 w-4 text-muted-foreground/50 group-hover:text-primary group-hover:translate-x-1 transition-all shrink-0" />
                   </button>
                 ))}
               </div>
@@ -574,7 +586,7 @@ export function Editor({ post, userId, onPostUpdated, onStartNewPost, weeklyPost
               <Button
                 onClick={handleGenerate}
                 disabled={!rawInput.trim() || !takeaway.trim() || isGenerating}
-                className="w-full h-12 rounded-xl text-base font-semibold shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all"
+                className="premium-cta w-full h-14 rounded-2xl text-base font-semibold"
                 size="lg"
               >
                 {isGenerating ? (
@@ -606,9 +618,9 @@ export function Editor({ post, userId, onPostUpdated, onStartNewPost, weeklyPost
               </div>
 
               {/* ── Post Card ─────────────────────────────── */}
-              <div className="rounded-2xl border-2 border-border/60 bg-card shadow-xl shadow-black/5 overflow-hidden">
+              <div className="rounded-3xl border border-border/60 bg-card shadow-[0_24px_80px_-44px_rgba(15,23,42,0.45)] overflow-hidden transition-all duration-300">
                 {/* LinkedIn-style header */}
-                <div className="flex items-center gap-3 p-4 pb-3 border-b bg-muted/20">
+                <div className="flex items-center gap-3 p-4 pb-3 border-b bg-muted/20 backdrop-blur-sm">
                   <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center border border-primary/20">
                     <span className="font-bold text-primary text-sm">You</span>
                   </div>
@@ -629,7 +641,7 @@ export function Editor({ post, userId, onPostUpdated, onStartNewPost, weeklyPost
                 </div>
 
                 {/* Post content */}
-                <div className="p-4 md:p-5">
+                <div className="p-5 md:p-6 space-y-4">
                   {isEditing ? (
                     <Textarea
                       value={content}
@@ -637,9 +649,17 @@ export function Editor({ post, userId, onPostUpdated, onStartNewPost, weeklyPost
                       className="min-h-[200px] text-[15px] leading-relaxed resize-y border-0 p-0 focus-visible:ring-0 bg-transparent"
                     />
                   ) : (
-                    <div className="prose prose-sm max-w-none dark:prose-invert text-[15px] leading-relaxed">
-                      <Markdown>{content}</Markdown>
-                    </div>
+                    <>
+                      {hookLine && (
+                        <div className="rounded-2xl border border-primary/25 bg-primary/5 px-4 py-3">
+                          <p className="text-[11px] uppercase tracking-[0.16em] text-primary font-semibold mb-1">Hook</p>
+                          <p className="text-lg md:text-xl leading-snug font-semibold tracking-tight">{hookLine}</p>
+                        </div>
+                      )}
+                      <div className="prose prose-sm max-w-none dark:prose-invert text-[15px] leading-relaxed">
+                        <Markdown>{bodyMarkdown || content}</Markdown>
+                      </div>
+                    </>
                   )}
                 </div>
 
@@ -657,7 +677,7 @@ export function Editor({ post, userId, onPostUpdated, onStartNewPost, weeklyPost
                   </div>
                   <Button
                     onClick={copyToClipboard}
-                    className="h-9 px-5 rounded-full font-semibold text-sm shadow-sm"
+                    className="premium-cta h-10 px-6 rounded-full font-semibold text-sm text-primary-foreground"
                   >
                     {copied ? (
                       <><Check className="h-4 w-4 mr-1.5 text-emerald-300" /> Copied!</>

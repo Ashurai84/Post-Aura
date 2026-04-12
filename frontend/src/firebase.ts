@@ -1,5 +1,5 @@
 import { initializeApp, type FirebaseOptions } from "firebase/app";
-import { getAuth, GoogleAuthProvider, signInWithRedirect, getRedirectResult, signOut } from "firebase/auth";
+import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signOut } from "firebase/auth";
 import { getFirestore, doc, setDoc, getDoc, serverTimestamp, setLogLevel } from "firebase/firestore";
 import { getAnalytics, isSupported } from "firebase/analytics";
 
@@ -51,8 +51,16 @@ if (typeof window !== "undefined" && import.meta.env.VITE_FIREBASE_MEASUREMENT_I
 
 export const signInWithGoogle = async () => {
   try {
-    await signInWithRedirect(auth, googleProvider);
+    // Prefer popup flow so auth doesn't depend on Firebase redirect helper hosting.
+    await signInWithPopup(auth, googleProvider);
   } catch (error) {
+    const code = (error as { code?: string })?.code;
+    // Fallback to redirect where popup auth is blocked or unsupported.
+    if (code === "auth/popup-blocked" || code === "auth/operation-not-supported-in-this-environment") {
+      await signInWithRedirect(auth, googleProvider);
+      return;
+    }
+
     if (import.meta.env.DEV) {
       console.error("Error signing in with Google", error);
     } else {

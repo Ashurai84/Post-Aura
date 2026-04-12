@@ -4,7 +4,7 @@ import { getAdminDb, getAdminAuth } from "../services/firebaseAdmin";
 
 const router = express.Router();
 
-const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || "raia40094@gmail.com")
+const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || "")
   .split(",")
   .map((e) => e.trim().toLowerCase())
   .filter(Boolean);
@@ -42,7 +42,7 @@ router.get("/stats", async (_req: AuthRequest, res) => {
     let intentPro = 0;
     let intentStudent = 0;
 
-    analyticsSnap.forEach((doc) => {
+    analyticsSnap.forEach((doc: any) => {
       const data = doc.data();
       if (data.type === "post-generated") postGenerations++;
       if (data.type === "image-generated") imageGenerations++;
@@ -76,7 +76,7 @@ router.get("/users", async (_req: AuthRequest, res) => {
     const db = getAdminDb();
     const usersSnap = await db.collection("users").get();
 
-    const users = usersSnap.docs.map((doc) => {
+    const users = usersSnap.docs.map((doc: any) => {
       const data = doc.data();
       return {
         uid: doc.id,
@@ -87,7 +87,7 @@ router.get("/users", async (_req: AuthRequest, res) => {
         createdAt: data.createdAt,
         postsAnalyzed: data.voiceProfile?.postsAnalyzed || 0,
       };
-    }).sort((a, b) => {
+    }).sort((a: any, b: any) => {
       const timeA = a.createdAt?.toMillis?.() || a.createdAt?._seconds || 0;
       const timeB = b.createdAt?.toMillis?.() || b.createdAt?._seconds || 0;
       return timeB - timeA;
@@ -110,7 +110,7 @@ router.get("/users/:userId/posts", async (req: AuthRequest, res) => {
       .where("userId", "==", userId)
       .get();
 
-    const posts = postsSnap.docs.map((doc) => {
+    const posts = postsSnap.docs.map((doc: any) => {
       const data = doc.data();
       return {
         id: doc.id,
@@ -123,7 +123,7 @@ router.get("/users/:userId/posts", async (req: AuthRequest, res) => {
         copiedAt: data.copiedAt || null,
         performance: data.performance || null,
       };
-    }).sort((a, b) => {
+    }).sort((a: any, b: any) => {
       const timeA = a.createdAt?.toMillis?.() || a.createdAt?._seconds || 0;
       const timeB = b.createdAt?.toMillis?.() || b.createdAt?._seconds || 0;
       return timeB - timeA;
@@ -142,20 +142,20 @@ router.get("/user-data", async (_req: AuthRequest, res) => {
     const usersSnap = await db.collection("users").get();
     
     // Sort and limit users first
-    const sortedUserDocs = usersSnap.docs.slice().sort((a, b) => {
+    const sortedUserDocs = usersSnap.docs.slice().sort((a: any, b: any) => {
       const timeA = a.data().createdAt?.toMillis?.() || a.data().createdAt?._seconds || 0;
       const timeB = b.data().createdAt?.toMillis?.() || b.data().createdAt?._seconds || 0;
       return timeB - timeA;
     }).slice(0, 50);
 
     const usersWithPosts = await Promise.all(
-      sortedUserDocs.map(async (userDoc) => {
+      sortedUserDocs.map(async (userDoc: any) => {
         const userData = userDoc.data();
         const postsSnap = await db.collection("posts")
           .where("userId", "==", userDoc.id)
           .get();
 
-        const posts = postsSnap.docs.map((doc) => {
+        const posts = postsSnap.docs.map((doc: any) => {
           const data = doc.data();
           return {
             id: doc.id,
@@ -164,7 +164,7 @@ router.get("/user-data", async (_req: AuthRequest, res) => {
             createdAt: data.createdAt,
             performance: data.performance || null,
           };
-        }).sort((a, b) => {
+        }).sort((a: any, b: any) => {
           const timeA = a.createdAt?.toMillis?.() || a.createdAt?._seconds || 0;
           const timeB = b.createdAt?.toMillis?.() || b.createdAt?._seconds || 0;
           return timeB - timeA;
@@ -200,7 +200,7 @@ router.delete("/users/:userId", async (req: AuthRequest, res) => {
     // 2. Delete posts
     const postsSnap = await db.collection("posts").where("userId", "==", userId).get();
     const batch = db.batch();
-    postsSnap.docs.forEach(doc => batch.delete(doc.ref));
+    postsSnap.docs.forEach((doc: any) => batch.delete(doc.ref));
     await batch.commit().catch(console.warn);
 
     // 3. Delete from Firebase Auth

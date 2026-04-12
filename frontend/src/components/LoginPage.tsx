@@ -1,14 +1,26 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "motion/react";
-import { signInWithGoogle, handleRedirectResult } from "../firebase";
+import { auth, signInWithGoogle, handleRedirectResult } from "../firebase";
 
 export function LoginPage() {
   const [isSigningIn, setIsSigningIn] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
-    handleRedirectResult().catch(() => {});
+    let isMounted = true;
+
+    handleRedirectResult()
+      .then((user) => {
+        if (isMounted && (user || auth.currentUser)) {
+          navigate("/dashboard", { replace: true });
+        }
+      })
+      .catch(() => {});
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const handleSignIn = async () => {

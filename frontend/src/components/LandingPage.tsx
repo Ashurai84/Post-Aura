@@ -1,585 +1,285 @@
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
 import { motion } from "motion/react";
-import { signInWithGoogle, handleRedirectResult } from "../firebase";
+import { Button } from "./ui/button";
+import { 
+  Linkedin, Bot, Sparkles, Wand2, Image as ImageIcon, 
+  ArrowRight, Mail, MessageSquareText, Zap, Target, 
+  Clock, CalendarCheck, Users, Edit3, TrendingUp, CheckCircle2
+} from "lucide-react";
+import { signInWithGoogle } from "../firebase";
 
 export function LandingPage() {
-  const [isSigningIn, setIsSigningIn] = useState(false);
-  const navigate = useNavigate();
+  const fadeUp = {
+    hidden: { opacity: 0, y: 40 },
+    visible: { opacity: 1, y: 0, transition: { duration: 0.8, ease: [0.16, 1, 0.3, 1] as any } }
+  };
 
-  useEffect(() => {
-    handleRedirectResult().catch(() => {});
-  }, []);
-
-  const handleSignIn = async () => {
-    if (isSigningIn) return;
-    setIsSigningIn(true);
-    try {
-      await signInWithGoogle();
-    } catch (err: unknown) {
-      const code = (err as { code?: string })?.code;
-      if (code === "auth/popup-closed-by-user" || code === "auth/cancelled-popup-request") {
-        // silent
-      } else if (code === "auth/unauthorized-domain") {
-        alert("Sign-in is not available from this domain right now. Please try again later.");
-      } else {
-        alert("Sign-in failed. Please try again.");
-      }
-    } finally {
-      setIsSigningIn(false);
+  const staggerContainer = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: { staggerChildren: 0.15 }
     }
   };
 
-  const fadeUp = {
-    hidden: { opacity: 0, y: 30 },
-    visible: { opacity: 1, y: 0, transition: { duration: 0.7, ease: [0.16, 1, 0.3, 1] as [number, number, number, number] } },
-  };
-
-  const stagger = {
-    hidden: { opacity: 0 },
-    visible: { opacity: 1, transition: { staggerChildren: 0.12 } },
+  const floatAnimation = {
+    y: ["-10px", "10px"],
+    transition: {
+      duration: 4,
+      repeat: Infinity,
+      repeatType: "reverse" as const,
+      ease: "easeInOut" as any
+    }
   };
 
   return (
-    <div
-      className="min-h-screen overflow-x-hidden"
-      style={{
-        backgroundColor: "#FAFAF8",
-        color: "#0F0F0F",
-        fontFamily: "system-ui, -apple-system, sans-serif",
-      }}
-    >
-      {/* ─── NAV ─── */}
-      <nav
-        style={{ borderBottom: "1px solid #E5E5E0" }}
-        className="fixed top-0 w-full z-50 backdrop-blur-md"
-      >
-        <div
-          className="flex items-center justify-between max-w-6xl mx-auto"
-          style={{ padding: "16px 24px", backgroundColor: "rgba(250,250,248,0.85)" }}
-        >
-          <span
-            style={{
-              fontFamily: "Georgia, 'Times New Roman', serif",
-              fontStyle: "italic",
-              fontSize: "18px",
-              fontWeight: 400,
-              color: "#0F0F0F",
-              letterSpacing: "-0.02em",
-            }}
-          >
-            PostAura
-          </span>
-          <button
-            onClick={() => navigate("/login")}
-            style={{
-              background: "none",
-              border: "none",
-              cursor: "pointer",
-              fontFamily: "system-ui, sans-serif",
-              fontSize: "14px",
-              color: "#6B6B6B",
-              padding: 0,
-              textDecoration: "none",
-            }}
-            onMouseEnter={(e) => (e.currentTarget.style.textDecoration = "underline")}
-            onMouseLeave={(e) => (e.currentTarget.style.textDecoration = "none")}
-          >
-            Sign in
-          </button>
+    <div className="min-h-screen bg-background text-foreground overflow-x-hidden font-sans selection:bg-primary/20">
+      {/* Navigation */}
+      <nav className="fixed top-0 w-full z-50 bg-background/70 backdrop-blur-xl border-b border-border/50 transition-all">
+        <div className="flex items-center justify-between p-4 max-w-7xl mx-auto">
+          <div className="flex items-center gap-2 group cursor-pointer">
+            <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center group-hover:bg-primary/20 transition-colors">
+              <Linkedin className="h-5 w-5 text-primary" />
+            </div>
+            <span className="font-bold text-lg tracking-tight">PostAura</span>
+          </div>
+          <Button onClick={signInWithGoogle} variant="default" className="rounded-full px-6 shadow-sm hover:shadow-md transition-all">
+            Sign In
+          </Button>
         </div>
       </nav>
 
-      <main style={{ paddingTop: "80px" }}>
-        {/* ─── HERO ─── */}
-        <section
-          className="max-w-3xl mx-auto"
-          style={{ padding: "100px 24px 80px" }}
-        >
-          <motion.div initial="hidden" animate="visible" variants={stagger}>
-            <motion.p
-              variants={fadeUp}
-              style={{
-                fontFamily: "'SF Mono', 'Fira Code', 'Consolas', monospace",
-                fontSize: "11px",
-                color: "#6B6B6B",
-                textTransform: "uppercase",
-                letterSpacing: "0.12em",
-                marginBottom: "32px",
-              }}
-            >
-              PostAura — LinkedIn Writing Engine
-            </motion.p>
-
-            <motion.h1
-              variants={fadeUp}
-              style={{
-                fontFamily: "Georgia, 'Times New Roman', serif",
-                fontStyle: "italic",
-                fontSize: "clamp(42px, 6vw, 68px)",
-                fontWeight: 400,
-                lineHeight: 1.08,
-                letterSpacing: "-0.03em",
-                color: "#0F0F0F",
-                marginBottom: "32px",
-              }}
-            >
-              Most people write
-              <br />
-              great posts.
-              <br />
-              Nobody reads them.
-            </motion.h1>
-
-            <motion.p
-              variants={fadeUp}
-              style={{
-                fontFamily: "system-ui, sans-serif",
-                fontSize: "18px",
-                lineHeight: 1.6,
-                color: "#6B6B6B",
-                maxWidth: "440px",
-                marginBottom: "48px",
-              }}
-            >
-              The algorithm doesn't punish bad writing.
-              <br />
-              It punishes bad formatting.
-              <br />
-              PostAura fixes that.
-            </motion.p>
-
-            <motion.div variants={fadeUp}>
-              <button
-                onClick={handleSignIn}
-                disabled={isSigningIn}
-                style={{
-                  backgroundColor: "#0F0F0F",
-                  color: "#FAFAF8",
-                  border: "none",
-                  borderRadius: "6px",
-                  padding: "14px 32px",
-                  fontSize: "15px",
-                  fontFamily: "system-ui, sans-serif",
-                  fontWeight: 500,
-                  cursor: "pointer",
-                  transition: "background-color 0.2s ease",
-                }}
-                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#D4522A")}
-                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "#0F0F0F")}
-              >
-                {isSigningIn ? "Signing in…" : "Start Writing — It's Free"}
-              </button>
+      <main className="pt-24">
+        {/* Hero Section */}
+        <section className="relative px-6 pt-20 pb-32 max-w-7xl mx-auto flex flex-col items-center text-center">
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[600px] bg-primary/10 blur-[120px] rounded-full pointer-events-none" />
+          
+          <motion.div initial="hidden" animate="visible" variants={staggerContainer} className="relative z-10 max-w-4xl space-y-8">
+            <motion.div variants={fadeUp} className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary text-sm font-medium border border-primary/20 hover:bg-primary/15 transition-colors cursor-default">
+              <Sparkles className="h-4 w-4" />
+              <span>The anti-robot AI co-writer for LinkedIn</span>
             </motion.div>
-
-            <motion.p
-              variants={fadeUp}
-              style={{
-                fontFamily: "'SF Mono', 'Fira Code', 'Consolas', monospace",
-                fontSize: "12px",
-                color: "#6B6B6B",
-                marginTop: "24px",
-              }}
-            >
-              12 writers already using PostAura
+            
+            <motion.h1 variants={fadeUp} className="text-5xl md:text-7xl font-extrabold tracking-tight leading-[1.1] text-balance">
+              Turn scattered thoughts into <br className="hidden md:block" />
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-500">viral LinkedIn posts.</span>
+            </motion.h1>
+            
+            <motion.p variants={fadeUp} className="text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed text-balance">
+              Never break your posting consistency again. Dump your raw ideas, select your audience, and let PostAura craft authentic, high-engagement content that sounds exactly like you.
             </motion.p>
+            
+            <motion.div variants={fadeUp} className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-8">
+              <Button onClick={signInWithGoogle} size="lg" className="rounded-full px-8 h-14 text-base shadow-xl shadow-primary/20 hover:scale-105 hover:shadow-primary/30 transition-all duration-300">
+                Start Writing for Free <ArrowRight className="ml-2 h-5 w-5" />
+              </Button>
+            </motion.div>
           </motion.div>
         </section>
 
-        {/* ─── HOW IT WORKS ─── */}
-        <section style={{ borderTop: "1px solid #E5E5E0", padding: "80px 24px" }}>
-          <div className="max-w-6xl mx-auto">
-            <motion.h2
-              initial="hidden"
-              whileInView="visible"
-              viewport={{ once: true }}
-              variants={fadeUp}
-              style={{
-                fontFamily: "Georgia, 'Times New Roman', serif",
-                fontStyle: "italic",
-                fontSize: "36px",
-                fontWeight: 400,
-                color: "#0F0F0F",
-                marginBottom: "64px",
-                letterSpacing: "-0.02em",
-              }}
+        {/* Storytelling / Use Case Section */}
+        <section className="py-24 bg-muted/30 border-y border-border/50 relative overflow-hidden">
+          <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px]"></div>
+          
+          <div className="max-w-7xl mx-auto px-6 relative z-10">
+            <motion.div 
+              initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-100px" }} variants={staggerContainer}
+              className="text-center max-w-3xl mx-auto mb-16 space-y-4"
             >
-              Here's what PostAura does.
-            </motion.h2>
+              <motion.h2 variants={fadeUp} className="text-3xl md:text-5xl font-bold tracking-tight">
+                How it works: <span className="text-primary">The College Fest Scenario</span>
+              </motion.h2>
+              <motion.p variants={fadeUp} className="text-lg text-muted-foreground">
+                You just attended an amazing tech fest. You have a few raw thoughts, but no time to format a perfect post. Here is how PostAura saves your consistency.
+              </motion.p>
+            </motion.div>
 
-            <div
-              className="grid gap-12"
-              style={{ gridTemplateColumns: "1fr 1fr" }}
-            >
-              {/* Left: Steps */}
-              <motion.div
-                initial="hidden"
-                whileInView="visible"
-                viewport={{ once: true }}
-                variants={stagger}
+            <div className="grid lg:grid-cols-2 gap-12 items-center">
+              {/* Left Side: The Input */}
+              <motion.div 
+                initial={{ opacity: 0, x: -50 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} transition={{ duration: 0.8, ease: "easeOut" }}
+                className="space-y-6"
               >
-                {[
-                  {
-                    num: "01",
-                    title: "Brain dump your thoughts",
-                    body: "Paste raw notes from a talk, a meeting, a shower thought. Don't format anything — that's our job.",
-                  },
-                  {
-                    num: "02",
-                    title: "Pick your audience",
-                    body: "Students, founders, CEOs, or general. PostAura adjusts tone, hooks, and structure to match who you're writing for.",
-                  },
-                  {
-                    num: "03",
-                    title: "Get a ready-to-post draft",
-                    body: "Formatted for the algorithm. Authentic to your voice. One click to copy, paste, publish.",
-                  },
-                ].map((step, i) => (
-                  <motion.div
-                    key={i}
-                    variants={fadeUp}
-                    style={{
-                      paddingBottom: "32px",
-                      marginBottom: "32px",
-                      borderBottom: i < 2 ? "1px solid #E5E5E0" : "none",
-                    }}
-                  >
-                    <p
-                      style={{
-                        fontFamily: "'SF Mono', 'Fira Code', 'Consolas', monospace",
-                        fontSize: "11px",
-                        color: "#6B6B6B",
-                        textTransform: "uppercase",
-                        letterSpacing: "0.1em",
-                        marginBottom: "12px",
-                      }}
-                    >
-                      {step.num}
-                    </p>
-                    <h3
-                      style={{
-                        fontFamily: "system-ui, sans-serif",
-                        fontSize: "18px",
-                        fontWeight: 600,
-                        color: "#0F0F0F",
-                        marginBottom: "8px",
-                      }}
-                    >
-                      {step.title}
-                    </h3>
-                    <p
-                      style={{
-                        fontFamily: "system-ui, sans-serif",
-                        fontSize: "15px",
-                        color: "#6B6B6B",
-                        lineHeight: 1.6,
-                      }}
-                    >
-                      {step.body}
-                    </p>
-                  </motion.div>
-                ))}
-              </motion.div>
+                <div className="bg-background border rounded-2xl p-6 shadow-xl shadow-black/5 relative">
+                  <div className="absolute -top-3 -left-3 bg-primary text-primary-foreground w-8 h-8 rounded-full flex items-center justify-center font-bold shadow-lg">1</div>
+                  <h3 className="text-lg font-semibold flex items-center gap-2 mb-4"><Edit3 className="h-5 w-5 text-primary"/> Brain Dump</h3>
+                  <div className="bg-muted/50 p-4 rounded-xl font-mono text-sm text-muted-foreground border border-border/50">
+                    "I just attended a session at my college where the CTO of Meesho spoke about building a startup. My key takeaway was to focus on the MVP and fail fast. I want to share this on LinkedIn so I don't miss my consistency."
+                  </div>
+                  <div className="mt-4 text-xs text-muted-foreground bg-primary/5 p-3 rounded-lg border border-primary/10">
+                    <span className="font-semibold text-primary">Pro tip:</span> For a perfect response, start your thoughts with phrases like <i>"I attended..."</i>, <i>"Just listened to..."</i>, or <i>"My key takeaway from..."</i> to capture the event's vibe.
+                  </div>
+                </div>
 
-              {/* Right: Mock post */}
-              <motion.div
-                initial={{ opacity: 0, y: 30 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.7, delay: 0.15 }}
-              >
-                <div
-                  style={{
-                    border: "1px solid #E5E5E0",
-                    borderRadius: "8px",
-                    padding: "32px",
-                    backgroundColor: "#FFFFFF",
-                    position: "relative",
-                  }}
-                >
-                  <p
-                    style={{
-                      position: "absolute",
-                      top: "16px",
-                      right: "20px",
-                      fontFamily: "'SF Mono', 'Fira Code', 'Consolas', monospace",
-                      fontSize: "11px",
-                      color: "#D4522A",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.06em",
-                    }}
-                  >
-                    High reach ↑
-                  </p>
-
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "12px",
-                      paddingBottom: "20px",
-                      marginBottom: "20px",
-                      borderBottom: "1px solid #E5E5E0",
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: "40px",
-                        height: "40px",
-                        borderRadius: "50%",
-                        backgroundColor: "#E5E5E0",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        fontSize: "14px",
-                        fontWeight: 600,
-                        color: "#6B6B6B",
-                      }}
-                    >
-                      Y
+                <div className="bg-background border rounded-2xl p-6 shadow-xl shadow-black/5 relative ml-8">
+                  <div className="absolute -top-3 -left-3 bg-primary text-primary-foreground w-8 h-8 rounded-full flex items-center justify-center font-bold shadow-lg">2</div>
+                  <h3 className="text-lg font-semibold flex items-center gap-2 mb-4"><Target className="h-5 w-5 text-primary"/> Target & Time</h3>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 block">Target Audience</label>
+                      <div className="flex flex-wrap gap-2">
+                        <span className="px-3 py-1 bg-primary/10 text-primary rounded-full text-sm font-medium border border-primary/20 flex items-center gap-1"><CheckCircle2 className="h-3 w-3"/> Founders</span>
+                        <span className="px-3 py-1 bg-primary/10 text-primary rounded-full text-sm font-medium border border-primary/20 flex items-center gap-1"><CheckCircle2 className="h-3 w-3"/> Students</span>
+                        <span className="px-3 py-1 bg-muted text-muted-foreground rounded-full text-sm border">CEOs</span>
+                        <span className="px-3 py-1 bg-muted text-muted-foreground rounded-full text-sm border">General</span>
+                      </div>
                     </div>
                     <div>
-                      <p style={{ fontWeight: 600, fontSize: "14px", color: "#0F0F0F" }}>
-                        Your Name
-                      </p>
-                      <p
-                        style={{
-                          fontSize: "12px",
-                          color: "#6B6B6B",
-                          fontFamily: "system-ui, sans-serif",
-                        }}
-                      >
-                        Building in public · 2h
-                      </p>
+                      <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 block">Smart Scheduling</label>
+                      <div className="flex items-center gap-2 text-sm bg-emerald-500/10 text-emerald-600 px-3 py-2 rounded-lg border border-emerald-500/20 w-fit">
+                        <Clock className="h-4 w-4" /> Best time for this audience: <strong>Tomorrow, 9:00 AM</strong>
+                      </div>
                     </div>
                   </div>
+                </div>
+              </motion.div>
 
-                  <div
-                    style={{
-                      fontFamily: "Georgia, 'Times New Roman', serif",
-                      fontSize: "15px",
-                      lineHeight: 1.7,
-                      color: "#0F0F0F",
-                    }}
-                  >
-                    <p style={{ marginBottom: "12px" }}>
-                      Just walked out of an incredible session with the CTO of Meesho at our
-                      college fest.
-                    </p>
-                    <p style={{ marginBottom: "12px", fontWeight: 600 }}>
-                      Stop overthinking. Build the MVP. Fail fast.
-                    </p>
-                    <p style={{ marginBottom: "12px" }}>
-                      Too many founders get stuck in the "perfect product" trap. The market
-                      doesn't care about perfect — it cares about solutions.
-                    </p>
-                    <p>What's the fastest MVP you've ever shipped?</p>
+              {/* Right Side: The Output */}
+              <motion.div 
+                initial={{ opacity: 0, x: 50 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} transition={{ duration: 0.8, ease: "easeOut", delay: 0.2 }}
+                animate={floatAnimation}
+                className="relative"
+              >
+                <div className="absolute inset-0 bg-gradient-to-tr from-blue-500/20 to-purple-500/20 rounded-3xl blur-2xl" />
+                <div className="relative bg-background border border-border/60 rounded-3xl p-6 shadow-2xl space-y-4">
+                  <div className="absolute -top-4 -right-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-4 py-1.5 rounded-full text-sm font-bold shadow-lg flex items-center gap-1">
+                    <TrendingUp className="h-4 w-4" /> Super Engagement
+                  </div>
+                  
+                  <div className="flex items-center gap-3 border-b pb-4">
+                    <div className="w-12 h-12 bg-gradient-to-br from-blue-100 to-blue-50 rounded-full flex items-center justify-center border border-blue-200">
+                      <span className="font-bold text-blue-700">You</span>
+                    </div>
+                    <div>
+                      <div className="font-semibold">Your Name</div>
+                      <div className="text-xs text-muted-foreground">Building in public | Tech Enthusiast</div>
+                      <div className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                        <Clock className="h-3 w-3" /> Scheduled for Tomorrow, 9:00 AM
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-3 text-sm leading-relaxed">
+                    <p>Just walked out of an incredible session with the CTO of Meesho at our college fest. My biggest takeaway? 🚀</p>
+                    <p><strong>Stop overthinking. Build the MVP. Fail fast.</strong></p>
+                    <p>Too many founders (and students!) get stuck in the "perfect product" trap. The market doesn't care about perfect; it cares about solutions.</p>
+                    <p>What's the fastest MVP you've ever shipped? Let's discuss below. 👇</p>
+                    <p className="text-primary font-medium">#StartupLessons #Meesho #TechLeadership #BuildInPublic #StudentFounders</p>
                   </div>
 
-                  <p
-                    style={{
-                      marginTop: "20px",
-                      fontSize: "13px",
-                      color: "#6B6B6B",
-                      fontFamily: "system-ui, sans-serif",
-                    }}
-                  >
-                    #StartupLessons #BuildInPublic #Meesho
-                  </p>
+                  <div className="w-full h-40 bg-muted rounded-xl border flex flex-col items-center justify-center text-muted-foreground relative overflow-hidden group">
+                    <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-purple-500/10" />
+                    <ImageIcon className="h-8 w-8 mb-2 text-primary/50" />
+                    <span className="text-xs font-medium z-10">AI Generated Image: "Tech stage with neon lights"</span>
+                  </div>
                 </div>
               </motion.div>
             </div>
           </div>
         </section>
 
-        {/* ─── FEATURES (2 columns, no cards) ─── */}
-        <section style={{ borderTop: "1px solid #E5E5E0", padding: "80px 24px" }}>
-          <div
-            className="max-w-5xl mx-auto"
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1px 1fr",
-              gap: "48px",
-              alignItems: "start",
-            }}
+        {/* Features Grid */}
+        <section className="py-32 px-6 max-w-7xl mx-auto">
+          <motion.div 
+            initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-100px" }} variants={staggerContainer}
+            className="text-center max-w-3xl mx-auto mb-20 space-y-4"
           >
-            <motion.div
-              initial="hidden"
-              whileInView="visible"
-              viewport={{ once: true }}
-              variants={fadeUp}
-            >
-              <h3
-                style={{
-                  fontFamily: "Georgia, 'Times New Roman', serif",
-                  fontStyle: "italic",
-                  fontSize: "32px",
-                  fontWeight: 400,
-                  color: "#0F0F0F",
-                  lineHeight: 1.2,
-                  marginBottom: "16px",
-                  letterSpacing: "-0.02em",
-                }}
-              >
-                Your words,
-                <br />
-                never diluted.
-              </h3>
-              <p
-                style={{
-                  fontFamily: "system-ui, sans-serif",
-                  fontSize: "16px",
-                  color: "#6B6B6B",
-                  lineHeight: 1.6,
-                }}
-              >
-                PostAura preserves your voice. No corporate jargon injection. No
-                "thought-leadership" filler. What you say stays yours — just structured to
-                perform.
-              </p>
-            </motion.div>
-
-            {/* Vertical divider */}
-            <div style={{ backgroundColor: "#E5E5E0", width: "1px", minHeight: "100%" }} />
-
-            <motion.div
-              initial="hidden"
-              whileInView="visible"
-              viewport={{ once: true }}
-              variants={fadeUp}
-            >
-              <h3
-                style={{
-                  fontFamily: "Georgia, 'Times New Roman', serif",
-                  fontStyle: "italic",
-                  fontSize: "32px",
-                  fontWeight: 400,
-                  color: "#0F0F0F",
-                  lineHeight: 1.2,
-                  marginBottom: "16px",
-                  letterSpacing: "-0.02em",
-                }}
-              >
-                Zero "delve".
-                <br />
-                Zero "tapestry".
-              </h3>
-              <p
-                style={{
-                  fontFamily: "system-ui, sans-serif",
-                  fontSize: "16px",
-                  color: "#6B6B6B",
-                  lineHeight: 1.6,
-                }}
-              >
-                We actively strip AI-sounding words. Your readers won't cringe. Your
-                LinkedIn won't feel like it was written by a chatbot pretending to be human.
-              </p>
-            </motion.div>
-          </div>
-        </section>
-
-        {/* ─── BOTTOM CTA ─── */}
-        <section
-          style={{
-            backgroundColor: "#0F0F0F",
-            padding: "80px 24px",
-          }}
-        >
-          <motion.div
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true }}
-            variants={stagger}
-            className="max-w-3xl mx-auto text-center"
-          >
-            <motion.h2
-              variants={fadeUp}
-              style={{
-                fontFamily: "Georgia, 'Times New Roman', serif",
-                fontStyle: "italic",
-                fontSize: "clamp(32px, 5vw, 48px)",
-                fontWeight: 400,
-                color: "#FAFAF8",
-                marginBottom: "16px",
-                letterSpacing: "-0.02em",
-              }}
-            >
-              Write once. Be remembered.
+            <motion.h2 variants={fadeUp} className="text-3xl md:text-5xl font-bold tracking-tight">
+              Everything you need for <span className="text-primary">LinkedIn growth.</span>
             </motion.h2>
+          </motion.div>
 
-            <motion.p
-              variants={fadeUp}
-              style={{
-                fontFamily: "system-ui, sans-serif",
-                fontSize: "16px",
-                color: "#6B6B6B",
-                marginBottom: "40px",
-              }}
-            >
-              Free to use. No credit card.
-            </motion.p>
-
-            <motion.div variants={fadeUp}>
-              <button
-                onClick={handleSignIn}
-                disabled={isSigningIn}
-                style={{
-                  backgroundColor: "#D4522A",
-                  color: "#FFFFFF",
-                  border: "none",
-                  borderRadius: "6px",
-                  padding: "14px 32px",
-                  fontSize: "15px",
-                  fontFamily: "system-ui, sans-serif",
-                  fontWeight: 500,
-                  cursor: "pointer",
-                  transition: "opacity 0.2s ease",
-                }}
-                onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.85")}
-                onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}
+          <motion.div 
+            initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-100px" }} variants={staggerContainer}
+            className="grid md:grid-cols-2 lg:grid-cols-4 gap-6"
+          >
+            {[
+              {
+                icon: <Users className="h-6 w-6" />,
+                title: "Target Audience Choice",
+                desc: "Tailor your tone instantly. Choose between Students, CEOs, Founders, or a General audience to hit the right chord.",
+                color: "blue"
+              },
+              {
+                icon: <CalendarCheck className="h-6 w-6" />,
+                title: "Consistency Engine",
+                desc: "Never miss a day. PostAura helps you maintain your streak by turning small thoughts into full posts in seconds.",
+                color: "emerald"
+              },
+              {
+                icon: <Clock className="h-6 w-6" />,
+                title: "Time Flexibility",
+                desc: "Get smart suggestions on the best times to post based on your selected audience to maximize your reach.",
+                color: "purple"
+              },
+              {
+                icon: <ImageIcon className="h-6 w-6" />,
+                title: "AI Image Generation",
+                desc: "Stop searching for stock photos. Generate custom, high-res visuals that perfectly match your post's vibe.",
+                color: "orange"
+              }
+            ].map((feature, i) => (
+              <motion.div 
+                key={i} variants={fadeUp} whileHover={{ y: -5 }}
+                className="bg-background border rounded-3xl p-6 shadow-sm hover:shadow-xl transition-all relative overflow-hidden group cursor-default"
               >
-                {isSigningIn ? "Signing in…" : "Start Writing Now →"}
-              </button>
-            </motion.div>
+                <div className={`absolute top-0 right-0 w-24 h-24 bg-${feature.color}-500/10 rounded-bl-full -z-10 group-hover:scale-125 transition-transform duration-500`} />
+                <div className={`w-12 h-12 bg-${feature.color}-500/10 rounded-2xl flex items-center justify-center text-${feature.color}-600 mb-6 group-hover:scale-110 transition-transform`}>
+                  {feature.icon}
+                </div>
+                <h3 className="text-lg font-semibold mb-2">{feature.title}</h3>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  {feature.desc}
+                </p>
+              </motion.div>
+            ))}
           </motion.div>
         </section>
 
-        {/* ─── FOOTER ─── */}
-        <footer
-          style={{
-            borderTop: "1px solid #E5E5E0",
-            padding: "24px 48px",
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            backgroundColor: "#FAFAF8",
-          }}
-        >
-          <span
-            style={{
-              fontFamily: "Georgia, 'Times New Roman', serif",
-              fontStyle: "italic",
-              fontSize: "14px",
-              color: "#6B6B6B",
-            }}
-          >
-            PostAura
-          </span>
-          <a
-            href="mailto:raia40094@gmail.com"
-            style={{
-              fontFamily: "'SF Mono', 'Fira Code', 'Consolas', monospace",
-              fontSize: "12px",
-              color: "#6B6B6B",
-              textDecoration: "none",
-            }}
-            onMouseEnter={(e) => (e.currentTarget.style.textDecoration = "underline")}
-            onMouseLeave={(e) => (e.currentTarget.style.textDecoration = "none")}
-          >
-            raia40094@gmail.com
-          </a>
-        </footer>
+        {/* CTA & Footer */}
+        <section className="border-t border-border/50 bg-muted/10 relative overflow-hidden">
+          <div className="absolute inset-0 bg-primary/5 blur-[100px] rounded-full pointer-events-none" />
+          <div className="max-w-7xl mx-auto px-6 py-24 flex flex-col items-center text-center space-y-8 relative z-10">
+            <motion.h2 
+              initial={{ opacity: 0, scale: 0.95 }} whileInView={{ opacity: 1, scale: 1 }} viewport={{ once: true }} transition={{ duration: 0.5 }}
+              className="text-3xl md:text-5xl font-bold tracking-tight"
+            >
+              Ready to build your personal brand?
+            </motion.h2>
+            <motion.p 
+              initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }} transition={{ delay: 0.2 }}
+              className="text-lg text-muted-foreground max-w-xl"
+            >
+              Join the professionals using PostAura to write better, post consistently, and grow their network.
+            </motion.p>
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: 0.3 }}
+            >
+              <Button onClick={signInWithGoogle} size="lg" className="rounded-full px-10 h-14 text-lg shadow-xl shadow-primary/20 hover:scale-105 transition-all duration-300">
+                Start Writing Now
+              </Button>
+            </motion.div>
+          </div>
+          
+          <footer className="border-t border-border/50 py-12 text-center bg-background/50 backdrop-blur-sm">
+            <div className="flex flex-col items-center justify-center gap-6 text-muted-foreground">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center">
+                  <Linkedin className="h-4 w-4 text-primary" />
+                </div>
+                <span className="font-semibold text-foreground text-lg tracking-tight">PostAura</span>
+              </div>
+              <p className="text-sm max-w-sm mx-auto">
+                Built for professionals who value authenticity and want to stand out in a sea of AI-generated content.
+              </p>
+              <div className="flex items-center gap-2 mt-2">
+                <a href="mailto:raia40094@gmail.com" className="group inline-flex items-center gap-2 text-sm font-medium hover:text-primary transition-colors bg-background border px-5 py-2.5 rounded-full shadow-sm hover:shadow-md">
+                  <Mail className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                  raia40094@gmail.com
+                </a>
+              </div>
+            </div>
+          </footer>
+        </section>
       </main>
     </div>
   );

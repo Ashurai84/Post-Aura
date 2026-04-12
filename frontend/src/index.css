@@ -128,3 +128,73 @@
     @apply font-sans;
     }
 }
+
+@layer utilities {
+  .ambient-orb {
+    position: absolute;
+    border-radius: 999px;
+    filter: blur(64px);
+    opacity: 0.66;
+    pointer-events: none;
+    animation: float-orb 14s ease-in-out infinite;
+    will-change: transform, opacity;
+    z-index: 0;
+  }
+
+  .premium-action-card {
+    border: 1px solid transparent;
+    background:
+      linear-gradient(hsl(var(--card)), hsl(var(--card))) padding-box,
+      linear-gradient(130deg, rgba(99, 102, 241, 0.25), rgba(16, 185, 129, 0.22), rgba(244, 114, 182, 0.22)) border-box;
+    transition: transform 220ms ease, box-shadow 220ms ease, border-color 220ms ease;
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.2) inset;
+  }
+
+  .premium-action-card:hover {
+    transform: translateY(-2px) scale(1.01);
+    box-shadow: 0 18px 38px -22px rgba(79, 70, 229, 0.45);
+  }
+
+  .premium-cta {
+    background: linear-gradient(135deg, rgb(79 70 229), rgb(59 130 246) 45%, rgb(14 165 233));
+    box-shadow: 0 10px 30px -14px rgba(59, 130, 246, 0.7);
+    transition: transform 180ms ease, box-shadow 180ms ease, opacity 180ms ease;
+  }
+
+  .premium-cta:hover {
+    transform: translateY(-1px) scale(1.01);
+    box-shadow: 0 18px 42px -20px rgba(59, 130, 246, 0.9);
+    opacity: 0.97;
+  }
+
+  .premium-panel {
+    background: linear-gradient(180deg, rgba(255,255,255,0.84), rgba(255,255,255,0.72));
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    box-shadow: 0 24px 60px -40px rgba(15, 23, 42, 0.45);
+  }
+
+  .dark .premium-panel {
+    background: linear-gradient(180deg, rgba(28, 28, 34, 0.9), rgba(24, 24, 30, 0.82));
+    border: 1px solid rgba(148, 163, 184, 0.25);
+  }
+}
+
+@keyframes float-orb {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+    opacity: 0.58;
+  }
+  50% {
+    transform: translate3d(0, -16px, 0) scale(1.06);
+    opacity: 0.72;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ambient-orb {
+    animation: none !important;
+    transform: none !important;
+  }
+}
