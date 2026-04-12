@@ -6,6 +6,7 @@ import { Sidebar } from "./components/Sidebar";
 import { Editor } from "./components/Editor";
 import { ImageGenerator } from "./components/ImageGenerator";
 import { LandingPage } from "./components/LandingPage";
+import { LoginPage } from "./components/LoginPage";
 import PaymentSuccess from "./PaymentSuccess";
 import { AdminDashboard } from "./components/AdminDashboard";
 import { Post } from "./types";
@@ -148,6 +149,7 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={user ? <Navigate to="/dashboard" /> : <LandingPage />} />
+        <Route path="/login" element={user ? <Navigate to="/dashboard" /> : <LoginPage />} />
         <Route path="/dashboard" element={user ? (
           <Dashboard 
             user={user} 

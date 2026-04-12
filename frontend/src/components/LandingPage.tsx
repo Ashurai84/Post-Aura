@@ -1,9 +1,11 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { motion } from "motion/react";
 import { signInWithGoogle, handleRedirectResult } from "../firebase";
 
 export function LandingPage() {
   const [isSigningIn, setIsSigningIn] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     handleRedirectResult().catch(() => {});
@@ -69,8 +71,7 @@ export function LandingPage() {
             PostAura
           </span>
           <button
-            onClick={handleSignIn}
-            disabled={isSigningIn}
+            onClick={() => navigate("/login")}
             style={{
               background: "none",
               border: "none",
@@ -84,7 +85,7 @@ export function LandingPage() {
             onMouseEnter={(e) => (e.currentTarget.style.textDecoration = "underline")}
             onMouseLeave={(e) => (e.currentTarget.style.textDecoration = "none")}
           >
-            {isSigningIn ? "Signing in…" : "Sign in"}
+            Sign in
           </button>
         </div>
       </nav>
