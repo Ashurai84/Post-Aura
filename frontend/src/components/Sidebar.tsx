@@ -1,4 +1,4 @@
-import { Plus, LogOut, FileText, Sparkles, Brain } from "lucide-react";
+import { Plus, LogOut, FileText, Sparkles, Brain, Trash2 } from "lucide-react";
 import { Button } from "./ui/button";
 import { ScrollArea } from "./ui/scroll-area";
 import { Post } from "../types";
@@ -9,10 +9,11 @@ interface SidebarProps {
   activePostId: string | null;
   onSelectPost: (id: string) => void;
   onNewPost: () => void;
+  onDeletePost: (id: string) => void;
   user: any;
 }
 
-export function Sidebar({ posts, activePostId, onSelectPost, onNewPost, user }: SidebarProps) {
+export function Sidebar({ posts, activePostId, onSelectPost, onNewPost, onDeletePost, user }: SidebarProps) {
   return (
     <div className="w-72 border-r border-border/60 bg-[linear-gradient(180deg,rgba(255,255,255,0.88),rgba(255,255,255,0.72))] dark:bg-[linear-gradient(180deg,rgba(18,18,24,0.9),rgba(18,18,24,0.78))] backdrop-blur-xl flex flex-col h-screen">
       <div className="p-4 border-b border-border/60 space-y-3">
@@ -46,15 +47,28 @@ export function Sidebar({ posts, activePostId, onSelectPost, onNewPost, user }: 
       <ScrollArea className="flex-1">
         <div className="p-3 space-y-1.5">
           {posts.map((post) => (
-            <Button
-              key={post.id}
-              variant={activePostId === post.id ? "secondary" : "ghost"}
-              className="w-full justify-start font-normal text-sm h-10 rounded-xl transition-all hover:scale-[1.01] hover:shadow-md"
-              onClick={() => onSelectPost(post.id!)}
-            >
-              <FileText className="mr-2 h-4 w-4 text-muted-foreground" />
-              <span className="truncate">{post.topic || "Untitled Post"}</span>
-            </Button>
+            <div key={post.id} className="grid grid-cols-[1fr_auto] items-center gap-1.5">
+              <Button
+                variant={activePostId === post.id ? "secondary" : "ghost"}
+                className="w-full min-w-0 justify-start font-normal text-sm h-10 rounded-xl transition-all hover:scale-[1.01] hover:shadow-md"
+                onClick={() => onSelectPost(post.id!)}
+              >
+                <FileText className="mr-2 h-4 w-4 text-muted-foreground" />
+                <span className="truncate">{post.topic || "Untitled Post"}</span>
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9 shrink-0 rounded-lg text-destructive hover:text-destructive hover:bg-destructive/10 border border-destructive/25"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (post.id) onDeletePost(post.id);
+                }}
+                title="Delete post"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
           ))}
           {posts.length === 0 && (
             <div className="p-4 text-center text-sm text-muted-foreground border border-dashed rounded-xl">

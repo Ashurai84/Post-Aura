@@ -1,0 +1,912 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PostAura V1.0 — Technical Documentation</title>
+  <style>
+    :root {
+      --bg: #f6f3ea;
+      --panel: #fffaf0;
+      --ink: #18140f;
+      --muted: #544a3e;
+      --accent: #c4572a;
+      --line: #e5d7c3;
+      --code-bg: #221f1a;
+      --code-ink: #fef4dc;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at top right, #f9d7af 0%, transparent 40%),
+        radial-gradient(circle at bottom left, #f7e8ca 0%, transparent 40%),
+        var(--bg);
+      font-family: "Charter", "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif;
+      line-height: 1.65;
+    }
+
+    .layout {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 28px;
+      display: grid;
+      gap: 24px;
+      grid-template-columns: 280px minmax(0, 1fr);
+    }
+
+    .toc {
+      position: sticky;
+      top: 18px;
+      align-self: start;
+      max-height: calc(100vh - 36px);
+      overflow: auto;
+      border: 1px solid var(--line);
+      background: color-mix(in srgb, var(--panel) 94%, white 6%);
+      border-radius: 16px;
+      padding: 18px;
+      box-shadow: 0 14px 38px rgba(30, 20, 10, 0.08);
+    }
+
+    .toc h2 {
+      margin: 0 0 12px;
+      font-family: "Avenir Next", "Gill Sans", "Trebuchet MS", sans-serif;
+      letter-spacing: 0.03em;
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .toc-item {
+      display: block;
+      color: var(--ink);
+      text-decoration: none;
+      margin: 8px 0;
+      font-size: 0.95rem;
+      transition: transform 150ms ease, color 150ms ease;
+    }
+
+    .toc-child { margin-left: 12px; font-size: 0.9rem; color: var(--muted); }
+    .toc-grandchild { margin-left: 24px; font-size: 0.84rem; color: var(--muted); }
+
+    .toc-item:hover {
+      color: var(--accent);
+      transform: translateX(2px);
+    }
+
+    .content {
+      border: 1px solid var(--line);
+      background: var(--panel);
+      border-radius: 22px;
+      padding: 30px;
+      box-shadow: 0 18px 42px rgba(26, 19, 13, 0.08);
+      animation: fadeIn 380ms ease;
+    }
+
+    h1, h2, h3, h4, h5, h6 {
+      line-height: 1.2;
+      margin: 1.5em 0 0.5em;
+      scroll-margin-top: 20px;
+    }
+
+    h1 {
+      margin-top: 0;
+      font-size: clamp(1.8rem, 4vw, 2.8rem);
+    }
+
+    h2 {
+      font-size: clamp(1.3rem, 2.2vw, 1.8rem);
+      border-top: 1px solid var(--line);
+      padding-top: 20px;
+    }
+
+    p { margin: 0.85em 0; }
+    ul, ol { padding-left: 1.3rem; }
+
+    a { color: var(--accent); }
+
+    code {
+      font-family: "SF Mono", "Menlo", "Consolas", monospace;
+      font-size: 0.9em;
+      padding: 0.1em 0.35em;
+      border-radius: 6px;
+      background: #efe3d1;
+    }
+
+    pre {
+      background: var(--code-bg);
+      color: var(--code-ink);
+      border-radius: 14px;
+      padding: 14px;
+      overflow: auto;
+    }
+
+    pre code {
+      background: transparent;
+      color: inherit;
+      padding: 0;
+      border-radius: 0;
+      font-size: 0.88rem;
+      line-height: 1.45;
+    }
+
+    hr {
+      border: 0;
+      border-top: 1px solid var(--line);
+      margin: 1.8em 0;
+    }
+
+    .table-wrap {
+      overflow-x: auto;
+      margin: 14px 0;
+    }
+
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      min-width: 620px;
+      border: 1px solid var(--line);
+      background: #fffcf6;
+    }
+
+    th, td {
+      border: 1px solid var(--line);
+      text-align: left;
+      padding: 9px;
+      vertical-align: top;
+      font-size: 0.92rem;
+    }
+
+    th {
+      background: #f2e8d8;
+      font-family: "Avenir Next", "Gill Sans", sans-serif;
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+      font-size: 0.74rem;
+    }
+
+    .meta {
+      margin-top: 24px;
+      font-size: 0.85rem;
+      color: var(--muted);
+      border-top: 1px solid var(--line);
+      padding-top: 16px;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @media (max-width: 960px) {
+      .layout {
+        grid-template-columns: 1fr;
+      }
+
+      .toc {
+        position: static;
+        max-height: none;
+      }
+
+      .content {
+        padding: 20px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <aside class="toc">
+      <h2>Table Of Contents</h2>
+      <a class="toc-item" href="#postaura-v10-technical-documentation">PostAura V1.0 — Technical Documentation</a>
+<a class="toc-item toc-child" href="#1-product-overview">1. PRODUCT OVERVIEW</a>
+<a class="toc-item toc-child" href="#2-the-antigravity-engine">2. THE ANTIGRAVITY ENGINE</a>
+<a class="toc-item toc-child" href="#3-architecture-overview">3. ARCHITECTURE OVERVIEW</a>
+<a class="toc-item toc-grandchild" href="#frontend">Frontend</a>
+<a class="toc-item toc-grandchild" href="#backend">Backend</a>
+<a class="toc-item toc-grandchild" href="#database">Database</a>
+<a class="toc-item toc-child" href="#4-folder-structure">4. FOLDER STRUCTURE</a>
+<a class="toc-item toc-child" href="#5-api-documentation">5. API DOCUMENTATION</a>
+<a class="toc-item toc-grandchild" href="#get-health">GET /health</a>
+<a class="toc-item toc-grandchild" href="#get-apihealth">GET /api/health</a>
+<a class="toc-item toc-grandchild" href="#post-apiaisynthesize">POST /api/ai/synthesize</a>
+<a class="toc-item toc-grandchild" href="#post-apiaiiterate">POST /api/ai/iterate</a>
+<a class="toc-item toc-grandchild" href="#post-apiaigenerate-image">POST /api/ai/generate-image</a>
+<a class="toc-item toc-grandchild" href="#post-apiaivoice-feedback">POST /api/ai/voice-feedback</a>
+<a class="toc-item toc-grandchild" href="#post-apianalyticstrack-intent">POST /api/analytics/track-intent</a>
+<a class="toc-item toc-grandchild" href="#post-apipaymentcreate-order">POST /api/payment/create-order</a>
+<a class="toc-item toc-grandchild" href="#post-apipaymentwebhook">POST /api/payment/webhook</a>
+<a class="toc-item toc-grandchild" href="#get-apipaymentstatus">GET /api/payment/status</a>
+<a class="toc-item toc-grandchild" href="#get-apiadminhealth">GET /api/admin/health</a>
+<a class="toc-item toc-grandchild" href="#get-apiadminstats">GET /api/admin/stats</a>
+<a class="toc-item toc-grandchild" href="#get-apiadminusers">GET /api/admin/users</a>
+<a class="toc-item toc-grandchild" href="#get-apiadminusersuseridposts">GET /api/admin/users/:userId/posts</a>
+<a class="toc-item toc-grandchild" href="#get-apiadminuser-data">GET /api/admin/user-data</a>
+<a class="toc-item toc-grandchild" href="#delete-apiadminusersuserid">DELETE /api/admin/users/:userId</a>
+<a class="toc-item toc-grandchild" href="#important-api-gap">Important API gap</a>
+<a class="toc-item toc-child" href="#6-data-models">6. DATA MODELS</a>
+<a class="toc-item toc-grandchild" href="#live-firestore-collections">Live Firestore collections</a>
+<a class="toc-item toc-grandchild" href="#legacy-mongodb-schemas">Legacy MongoDB schemas</a>
+<a class="toc-item toc-child" href="#7-gemini-prompt-engineering">7. GEMINI PROMPT ENGINEERING</a>
+<a class="toc-item toc-grandchild" href="#the-synthesize-prompt">The synthesize prompt</a>
+<a class="toc-item toc-grandchild" href="#the-iteration-prompt">The iteration prompt</a>
+<a class="toc-item toc-grandchild" href="#the-banned-words">The banned words</a>
+<a class="toc-item toc-grandchild" href="#why-strict-json-matters">Why strict JSON matters</a>
+<a class="toc-item toc-grandchild" href="#how-hashtagcount-is-passed-and-used">How `hashtagCount` is passed and used</a>
+<a class="toc-item toc-child" href="#8-design-system">8. DESIGN SYSTEM</a>
+<a class="toc-item toc-grandchild" href="#color-palette">Color palette</a>
+<a class="toc-item toc-grandchild" href="#typography">Typography</a>
+<a class="toc-item toc-grandchild" href="#component-patterns">Component patterns</a>
+<a class="toc-item toc-grandchild" href="#what-was-rejected">What was rejected</a>
+<a class="toc-item toc-child" href="#9-features-shipped-in-v1">9. FEATURES SHIPPED IN V1</a>
+<a class="toc-item toc-child" href="#10-bugs-fixed-in-v1">10. BUGS FIXED IN V1</a>
+<a class="toc-item toc-child" href="#11-decisions-log">11. DECISIONS LOG</a>
+<a class="toc-item toc-child" href="#12-environment-variables">12. ENVIRONMENT VARIABLES</a>
+<a class="toc-item toc-grandchild" href="#frontend-env">Frontend .env</a>
+<a class="toc-item toc-grandchild" href="#backend-env">Backend .env</a>
+<a class="toc-item toc-child" href="#13-deployment-guide">13. DEPLOYMENT GUIDE</a>
+<a class="toc-item toc-grandchild" href="#1-mongodb-atlas-setup">1. MongoDB Atlas setup</a>
+<a class="toc-item toc-grandchild" href="#2-firebase-configuration">2. Firebase configuration</a>
+<a class="toc-item toc-grandchild" href="#3-render-backend-deployment">3. Render backend deployment</a>
+<a class="toc-item toc-grandchild" href="#4-netlify-frontend-deployment">4. Netlify frontend deployment</a>
+<a class="toc-item toc-grandchild" href="#5-admin-deployment">5. Admin deployment</a>
+<a class="toc-item toc-grandchild" href="#6-environment-variables-setup">6. Environment variables setup</a>
+<a class="toc-item toc-grandchild" href="#7-custom-domain-setup">7. Custom domain setup</a>
+<a class="toc-item toc-child" href="#14-known-limitations-in-v1">14. KNOWN LIMITATIONS IN V1</a>
+<a class="toc-item toc-child" href="#15-v2-roadmap">15. V2 ROADMAP</a>
+<a class="toc-item toc-child" href="#16-positioning-qa-hinglish-english">16. POSITIONING Q&amp;A (HINGLISH + ENGLISH)</a>
+<a class="toc-item toc-grandchild" href="#q1-kya-user-3-second-me-samajh-paega-ki-product-kya-deta-hai">Q1) Kya user 3 second me samajh paega ki product kya deta hai?</a>
+<a class="toc-item toc-grandchild" href="#q2-kya-ye-chatgpt-jaisa-generic-lagega">Q2) Kya ye ChatGPT jaisa generic lagega?</a>
+<a class="toc-item toc-grandchild" href="#q3-sabse-strong-positioning-focus-kya-hona-chahiye-speed-voice-ya-growth">Q3) Sabse strong positioning focus kya hona chahiye: speed, voice, ya growth?</a>
+<a class="toc-item toc-grandchild" href="#q4-edit-ready-ya-ready-to-post-me-kya-choose-karna-chahiye">Q4) "Edit-ready" ya "ready-to-post" me kya choose karna chahiye?</a>
+<a class="toc-item toc-grandchild" href="#q5-moment-takeaway-phrase-use-karni-chahiye">Q5) "Moment + takeaway" phrase use karni chahiye?</a>
+<a class="toc-item toc-grandchild" href="#q6-product-ki-reality-kya-hai-direct-publish-ya-copy-flow">Q6) Product ki reality kya hai: direct publish ya copy flow?</a>
+<a class="toc-item toc-grandchild" href="#q7-user-objection-maine-5-tools-try-kiye-sab-same-lagte-hain-ka-response-kya-ho">Q7) User objection: "Maine 5 tools try kiye, sab same lagte hain" ka response kya ho?</a>
+<a class="toc-item toc-grandchild" href="#q8-final-one-line-positioning-sentence-kya-rahegi">Q8) Final one-line positioning sentence kya rahegi?</a>
+    </aside>
+
+    <main class="content">
+      <h1 id="postaura-v10-technical-documentation">PostAura V1.0 — Technical Documentation</h1>
+<p>Built by: Ashutosh Pankaj Rai Started: February 2026 V1 Shipped: April 2026 Status: Production</p>
+<hr />
+<h2 id="1-product-overview">1. PRODUCT OVERVIEW</h2>
+<p>PostAura is a LinkedIn post-writing workspace for people who already have the thought but need help turning it into a post that sounds like them, ships fast, and is worth copying into LinkedIn without another rewrite loop. It combines a structured editor, a voice-learning generation layer, image generation, posting-time suggestions, and a feedback loop that learns from the user's approvals and corrections.</p>
+<p>The core problem it solves is not "generate text." The real problem is that most people know what happened, know what they believe, and still do not publish because the blank page is too expensive. ChatGPT and Jasper give you a general-purpose prompt surface. PostAura gives you a product opinionated around one workflow: capture the moment, force the takeaway, generate in the user's voice, keep the draft editable, and make copying to LinkedIn painless.</p>
+<p>It is built for students, founders, early-career professionals, and solo creators who want to stay visible on LinkedIn without hiring a writer. The product assumes the user does not need a content strategy platform first; they need a faster route from raw experience to publishable post.</p>
+<p>What makes it different from ChatGPT or Jasper is the workflow, not the model. The system stores posts, tracks history, nudges weekly consistency, asks for a performance review 24 hours after copy-out, and progressively learns the user's style from approved and rejected drafts. The result is less "chat with AI" and more "post production system."</p>
+<h2 id="2-the-antigravity-engine">2. THE ANTIGRAVITY ENGINE</h2>
+<p>"Antigravity Engine" is the name for the base-lock iteration loop that keeps the draft grounded in the user's original thought instead of letting the model drift into generic LinkedIn sludge. The metaphor is intentional: ordinary AI writing tends to float away from the source idea. This engine keeps the base content locked and only lets the surface presentation change.</p>
+<p>The engine works in a fixed sequence:</p>
+<ol>
+<li>The user starts with a raw event or observation, then enters a mandatory takeaway. The takeaway is the opinion that anchors the post.</li>
+<li>The frontend sends <code>topic</code>, <code>takeaway</code>, <code>audience</code>, <code>tone</code>, and <code>hashtagCount</code> to <code>/api/ai/synthesize</code>.</li>
+<li>The backend reads any stored <code>voiceProfile</code> from Firestore, merges that into the prompt, and sends the request to Gemini.</li>
+<li>The model returns plain text. The backend does not trust the model for structure; it extracts hashtags with regex, removes banned tags, adds fallbacks if needed, and appends hashtags when the body does not already contain them.</li>
+<li>The resulting post is persisted in Firestore with <code>history</code>, <code>hashtags</code>, <code>bestPostingTime</code>, and timestamp fields.</li>
+<li>When the user iterates, the frontend sends the current post as the base, plus a single instruction and the locked hashtags.</li>
+<li>The backend prompt explicitly says not to invent facts, not to change the core story, and to preserve the original hashtags unless the topic changes dramatically.</li>
+<li>The user can approve or reject the voice. That feedback writes corrections back into the Firestore <code>voiceProfile</code>, so the next generation is closer to the user's style.</li>
+</ol>
+<p>Why this prevents semantic drift:</p>
+<ul>
+<li>The iteration prompt is anchored to the current content, not a fresh brainstorm.</li>
+<li>The backend always passes the original hashtags or fallback hashtags through a normalization layer.</li>
+<li>The voice profile adds style constraints, but the core story stays in the current draft.</li>
+<li>The UI keeps a version history so the user can revert instead of accepting cumulative model drift.</li>
+</ul>
+<p>The exact iteration commands in the editor are:</p>
+<div class="table-wrap"><table><thead><tr><th>Command</th><th>What it does</th></tr></thead><tbody><tr><td>Make it punchier</td><td>Shortens sentences and increases rhythm without changing the story.</td></tr><tr><td>Polarize</td><td>Pushes the stance harder so the post reads like a real opinion, not a neutral summary.</td></tr><tr><td>Shorten</td><td>Cuts filler and compresses the post.</td></tr><tr><td>Make it story-driven</td><td>Reframes the draft around narrative instead of explanation.</td></tr><tr><td>Add a CTA</td><td>Adds a closing call to action or question.</td></tr><tr><td>Too formal</td><td>Feedback path that rewrites the post more casually and updates the voice profile.</td></tr><tr><td>Too generic</td><td>Feedback path that forces more specificity and concrete detail.</td></tr><tr><td>Not my opinion</td><td>Feedback path that makes the stance more explicit and personal.</td></tr><tr><td>Too long</td><td>Feedback path that cuts the post by about 40%.</td></tr></tbody></table></div>
+<p>This is the core differentiator because it combines generation, revision, memory, and recovery into one loop. A generic chat window can generate copy. It does not give you a base-locked drafting system with opinion capture, reusable history, feedback-based voice learning, and publishing support.</p>
+<h2 id="3-architecture-overview">3. ARCHITECTURE OVERVIEW</h2>
+<p>The product is a hybrid stack: React + Vite on the frontend, Express + TypeScript on the backend, Gemini for text generation, Firebase Auth for identity, Firestore for live app state, and MongoDB for the legacy Mongoose layer that still boots at runtime. The live request path is Firestore-backed; the MongoDB layer is still present because the backend initializes it and the repository retains the schema/services used for user, feedback, and error tracking.</p>
+<p>That hybrid is the most important architectural fact in the repo. The README and early product framing talk about MongoDB, but the actual production code writes posts, users, analytics, and subscription state through Firebase Admin Firestore collections. MongoDB Atlas is still a real deployment requirement because the server calls <code>connectDB()</code> on startup and will fail hard if that connection fails.</p>
+<h3 id="frontend">Frontend</h3>
+<p>React + Vite was chosen because the app is a single-session content tool, not a search-first marketing site. Next.js would have added server rendering, route complexity, and a larger deployment surface without solving the core product problem. The shipped UI is a client-side app with local state, auth state, Firestore listeners, and direct API calls; Vite is the right amount of build tooling for that.</p>
+<p>Firebase Auth is Google-only in the user app because the product is optimized for fast, low-friction identity. The current code uses a <code>GoogleAuthProvider</code> only. LinkedIn OAuth is not implemented. That is deliberate: the app needs a trusted identity for Firestore ownership and backend authorization, not a second social graph permission surface.</p>
+<p>Netlify is the preferred static hosting target for the frontend and admin SPAs because both are static Vite builds with SPA rewrites. The repo also contains a Render blueprint, so the deployment layer is not hard-wired to a single provider. Vercel was rejected earlier in the project history because the monorepo layout and multi-app setup were easier to reason about with static site hosting plus a separate API service.</p>
+<h3 id="backend">Backend</h3>
+<p>Express + TypeScript was chosen because the backend is a narrow API surface with custom auth, rate gating, payment webhooks, and admin endpoints. Next.js API routes would have bundled the backend into the frontend deployment model and made the webhook/payment/admin split harder to keep explicit. Express keeps the API boundary visible.</p>
+<p>Gemini 2.5 Flash is used because the product depends on speed, low latency, and enough quality to produce a publishable draft quickly. GPT-4 would be overkill for this interaction model and would have changed the economics of the free-tier flow. The backend also includes a fallback to <code>gemini-2.0-flash</code> and exponential retry logic when Gemini returns quota or transient errors.</p>
+<p>MongoDB Atlas was chosen for the supporting persistence layer because the repository already contains Mongoose models for users, feedback, and error logs, and the backend process expects a live Mongo connection. PostgreSQL was not adopted because it would add a relational schema and migration surface without matching the Firestore-oriented product state already in use.</p>
+<p>Render is the backend deployment target because it is simple to wire to an Express web service with a health check, environment variables, and a build/start split. The backend is not serverless. That matters for the webhook flow and for the Firebase Admin initialization path.</p>
+<h3 id="database">Database</h3>
+<p>The live Firestore collections are:</p>
+<ul>
+<li><code>users</code> — Firebase auth profile, plan status, free usage, and voice profile memory.</li>
+<li><code>posts</code> — generated drafts, version history, hashtags, copied timestamps, performance feedback, and best posting time.</li>
+<li><code>analytics</code> — post-generation events, image-generation events, and pricing-intent events.</li>
+</ul>
+<p>The legacy Mongoose schemas are still in the repository:</p>
+<ul>
+<li><code>User</code> — tracks per-user counters, daily reset timing, and plan type.</li>
+<li><code>Feedback</code> — stores free-form product feedback.</li>
+<li><code>ErrorLog</code> — stores short-lived error telemetry with TTL cleanup.</li>
+</ul>
+<p>Why in-memory was replaced with persistence: the product depends on remembering posts, voice feedback, plan status, and performance reviews across sessions and across deployments. A restart-safe store was required. The codebase now does that with Firestore for live app behavior and MongoDB-backed schema files for the legacy service layer.</p>
+<p>The daily reset logic in <code>backend/services/usage.service.ts</code> resets counts at midnight because the original usage model was calendar-day oriented. Midnight is the cleanest daily boundary for content cadence and keeps the counter aligned with the user's mental model of "today's posting budget." That service is not wired into the current AI routes, but the logic remains in the tree.</p>
+<h2 id="4-folder-structure">4. FOLDER STRUCTURE</h2>
+<p>Generated build outputs and dependencies are omitted here; this is the source tree that matters for the shipped product.</p>
+<pre><code class="language-text">post-aura/
+  package.json               Root scripts. Starts the backend with tsx and builds the frontend bundle.
+  README.md                  Product-facing overview and quickstart for the current snapshot.
+  render.yaml                Render blueprint for backend and both static frontends.
+  docs/                      Documentation output lives here.
+
+  admin/                     Separate admin SPA for internal monitoring.
+    index.html               Vite entry point for the admin app.
+    package.json             Admin app dependencies and scripts.
+    tsconfig.json            Admin TypeScript config.
+    tsconfig.node.json       Vite config TypeScript config for admin.
+    vite.config.ts           Admin Vite setup and localhost port 5174.
+    .gitignore               Admin-specific secret and build exclusions.
+    server/routes.ts         Older/smaller admin route implementation; current production admin UI talks to backend /api/admin/*.
+    src/
+      main.tsx               Admin SPA bootstrap and route gate.
+      Login.tsx              Firebase email/password admin sign-in screen.
+      AdminDashboard.tsx     Stats, users, feedback, and error-log dashboard UI.
+      firebase.ts            Admin Firebase client config.
+      index.css              Admin styling entry.
+      vite-env.d.ts          Admin Vite env typings.
+      components/ui/button.tsx  Shared button primitive.
+      lib/adminAccess.ts        Admin allowlist helper and dashboard URL helper.
+      lib/utils.ts              Shared className merge helper.
+
+  backend/                   Express API and supporting services.
+    package.json             Backend-only package and scripts.
+    tsconfig.json            Backend TypeScript config.
+    .env.example             Minimal Mongo example for local setup.
+    .gitignore               Backend secret and build exclusions.
+    server.ts                Express bootstrap, CORS, JSON parsing, DB connect, health route.
+    routes.ts                Primary API router for AI, analytics, and payment/admin mounting.
+    routes/
+      admin.ts               Admin API endpoints used by the admin dashboard.
+      payment.ts             Instamojo create-order, webhook, and status endpoints.
+    config/
+      db.ts                  Mongoose connection bootstrap.
+      env.ts                 Backend env parsing and default usage limits.
+    middleware/
+      auth.ts                Firebase bearer-token verification.
+      checkUsage.ts          Free-tier gate and plan-expiry enforcement.
+    models/
+      User.model.ts          Legacy Mongoose user schema.
+      Feedback.model.ts      Legacy Mongoose feedback schema.
+      ErrorLog.model.ts      Legacy Mongoose error schema with TTL.
+    services/
+      aiService.ts           Gemini text generation and image URL generation.
+      firebaseAdmin.ts       Firebase Admin SDK init for Firestore/Auth access.
+      monitor.service.ts     Legacy error logging helpers built on ErrorLog.
+      usage.service.ts       Legacy usage tracking helpers built on User.
+      user.service.ts        Legacy user/feedback persistence helpers.
+
+  frontend/                  Main user-facing SPA.
+    index.html               Vite entry point.
+    package.json             Frontend app dependencies and scripts.
+    tsconfig.json            Frontend TypeScript config.
+    vite.config.ts           Frontend Vite setup and aliasing.
+    components.json          shadcn/base-ui configuration metadata.
+    public/
+      _headers               Netlify/host headers for the SPA.
+      _redirects             SPA rewrite rules.
+      robots.txt             Crawl policy.
+      sitemap.xml            Search indexing sitemap.
+      og-image.png          Share image asset.
+    src/
+      main.tsx               React root mount.
+      App.tsx                Top-level routing, auth guard, and dashboard orchestration.
+      PaymentSuccess.tsx     Subscription confirmation page.
+      firebase.ts            Firebase client config, Google auth, Firestore bootstrap.
+      types.ts               Shared app types for posts/history/users.
+      index.css              Theme tokens, premium utility classes, and motion helpers.
+      vite-env.d.ts          Frontend Vite env typings.
+      lib/
+        api.ts               API base URL helper.
+        gemini.ts            Frontend wrapper around AI and image endpoints.
+        utils.ts             ClassName merge helper.
+      components/
+        LandingPage.tsx      Main marketing landing page.
+        LandingBelowFold.tsx Secondary landing content and CTA sections.
+        LoginPage.tsx        Auth screen for the user app.
+        Editor.tsx           Core post-generation editor and iteration flow.
+        ImageGenerator.tsx   Prompt-to-image UI.
+        Sidebar.tsx          Post list, new post action, and sign-out area.
+        PaywallModal.tsx     Free-limit upgrade modal and Instamojo entry point.
+        ui/
+          button.tsx         Base button primitive.
+          input.tsx          Base input primitive.
+          label.tsx          Base label primitive.
+          scroll-area.tsx    Base scroll container primitive.
+          select.tsx         Base select primitive.
+          tabs.tsx           Base tabs primitive.
+          textarea.tsx       Base textarea primitive.</code></pre>
+<p>Why the separation exists: the user app, admin console, and API are deployed and configured independently. They share Firebase config, but their runtime concerns are different. The user app is for content creation, the admin app is for internal monitoring, and the backend is the only service allowed to touch secrets, Gemini, Firebase Admin credentials, and payment webhooks.</p>
+<h2 id="5-api-documentation">5. API DOCUMENTATION</h2>
+<h3 id="get-health">GET /health</h3>
+<p>Returns <code>{ "status": "ok" }</code> from <code>backend/server.ts</code>.</p>
+<ul>
+<li>Request body: none.</li>
+<li>Response shape: <code>{ status: string }</code>.</li>
+<li>Errors: none beyond network/runtime failures.</li>
+<li>Rate limits: none.</li>
+<li>Access: public.</li>
+</ul>
+<h3 id="get-apihealth">GET /api/health</h3>
+<p>Returns <code>{ "status": "ok", "message": "PostAura Backend is running" }</code> from the mounted router in <code>backend/routes.ts</code>.</p>
+<ul>
+<li>Request body: none.</li>
+<li>Response shape: <code>{ status: string, message: string }</code>.</li>
+<li>Errors: none beyond network/runtime failures.</li>
+<li>Rate limits: none.</li>
+<li>Access: public.</li>
+</ul>
+<h3 id="post-apiaisynthesize">POST /api/ai/synthesize</h3>
+<p>Request body:</p>
+<pre><code class="language-json">{
+  "topic": "string",
+  "takeaway": "string",
+  "audience": "string",
+  "tone": "string",
+  "hashtagCount": 3 | 5 | 10
+}</code></pre>
+<p>Response shape:</p>
+<pre><code class="language-json">{
+  "result": "string",
+  "voiceTags": ["string"],
+  "postsAnalyzed": 0,
+  "hashtags": ["string"],
+  "bestPostingTime": { "label": "string", "reason": "string" } | null
+}</code></pre>
+<p>Error responses:</p>
+<ul>
+<li><code>401</code> if the Firebase bearer token is missing or invalid.</li>
+<li><code>402</code> with <code>{ code: "UPGRADE_REQUIRED", error: "Free limit reached. Please upgrade to Pro." }</code> when the free cap is reached.</li>
+<li><code>429</code> with <code>{ code: "QUOTA_EXCEEDED", error: "Gemini API quota exceeded..." }</code> when Gemini returns quota/rate-limit failure.</li>
+<li><code>500</code> with a generic internal server error message.</li>
+</ul>
+<p>Rate limits:</p>
+<ul>
+<li>No transport-level throttling is implemented.</li>
+<li>The <code>checkUsage</code> middleware blocks free users after 5 AI actions.</li>
+<li>Gemini calls are retried with exponential backoff and a second model fallback.</li>
+</ul>
+<p>Access:</p>
+<ul>
+<li>Authenticated Firebase user required.</li>
+<li>Free or paid users are allowed until the free cap is exhausted.</li>
+</ul>
+<h3 id="post-apiaiiterate">POST /api/ai/iterate</h3>
+<p>Request body:</p>
+<pre><code class="language-json">{
+  "currentContent": "string",
+  "instruction": "string",
+  "topic": "string",
+  "audience": "string",
+  "hashtags": ["string"],
+  "hashtagCount": 3 | 5 | 10
+}</code></pre>
+<p>Response shape:</p>
+<pre><code class="language-json">{
+  "result": "string",
+  "hashtags": ["string"]
+}</code></pre>
+<p>Error responses and access controls match <code>/api/ai/synthesize</code>.</p>
+<p>Rate limits:</p>
+<ul>
+<li>Same free-cap gate as synthesis because <code>checkUsage</code> is mounted here too.</li>
+</ul>
+<h3 id="post-apiaigenerate-image">POST /api/ai/generate-image</h3>
+<p>Request body:</p>
+<pre><code class="language-json">{
+  "prompt": "string",
+  "size": "1K" | "2K" | "4K"
+}</code></pre>
+<p>Response shape:</p>
+<pre><code class="language-json">{ "url": "string" }</code></pre>
+<p>Error responses, rate limits, and access controls match the other AI routes.</p>
+<h3 id="post-apiaivoice-feedback">POST /api/ai/voice-feedback</h3>
+<p>Request body:</p>
+<pre><code class="language-json">{
+  "type": "approved" | "rejected",
+  "reason": "string | null",
+  "content": "string | null"
+}</code></pre>
+<p>Response shape:</p>
+<pre><code class="language-json">{ "ok": true }</code></pre>
+<p>Errors are intentionally swallowed on the server side where possible so feedback does not block the user experience. Access requires a valid Firebase token.</p>
+<h3 id="post-apianalyticstrack-intent">POST /api/analytics/track-intent</h3>
+<p>Request body:</p>
+<pre><code class="language-json">{ "plan": "student" | "pro" }</code></pre>
+<p>Response shape:</p>
+<pre><code class="language-json">{ "ok": true }</code></pre>
+<p>Access requires a valid Firebase token. No explicit rate limit is implemented.</p>
+<h3 id="post-apipaymentcreate-order">POST /api/payment/create-order</h3>
+<p>Request body:</p>
+<pre><code class="language-json">{ "plan": "student" | "pro", "demo": true | false }</code></pre>
+<p>Response shape:</p>
+<pre><code class="language-json">{ "payment_url": "string" }</code></pre>
+<p>Behavior:</p>
+<ul>
+<li>In demo mode, the backend directly upgrades the user's Firestore <code>users</code> document for 30 days and returns a demo success URL.</li>
+<li>In live mode, the backend creates an Instamojo payment request and returns the redirect URL from Instamojo.</li>
+</ul>
+<p>Errors:</p>
+<ul>
+<li><code>401</code> if the token is missing/invalid.</li>
+<li><code>500</code> if Instamojo creation fails or credentials are missing.</li>
+</ul>
+<p>Access:</p>
+<ul>
+<li>Authenticated Firebase user required.</li>
+</ul>
+<h3 id="post-apipaymentwebhook">POST /api/payment/webhook</h3>
+<p>Request body: Instamojo webhook payload.</p>
+<p>Response shape: plain text <code>OK</code>, <code>MAC Mismatch</code>, or <code>Error but OK</code>.</p>
+<p>Behavior:</p>
+<ul>
+<li>Verifies the MAC using <code>INSTAMOJO_SALT</code>.</li>
+<li>On <code>Credit</code>, finds the user by email in Firestore and upgrades them for 30 days.</li>
+</ul>
+<p>Access:</p>
+<ul>
+<li>Public webhook endpoint; no Firebase auth.</li>
+</ul>
+<p>Rate limits: none; relies on Instamojo delivery semantics.</p>
+<h3 id="get-apipaymentstatus">GET /api/payment/status</h3>
+<p>Response shape:</p>
+<pre><code class="language-json">{
+  "isPro": false,
+  "planType": "free",
+  "freeGenerationsUsed": 0,
+  "planExpiresAt": null
+}</code></pre>
+<p>Errors: <code>500</code> on backend failure.</p>
+<p>Access:</p>
+<ul>
+<li>Authenticated Firebase user required.</li>
+</ul>
+<h3 id="get-apiadminhealth">GET /api/admin/health</h3>
+<p>Returns <code>{ "status": "ok", "message": "Admin routes correctly mounted" }</code>.</p>
+<ul>
+<li>Access: public.</li>
+<li>Rate limits: none.</li>
+</ul>
+<h3 id="get-apiadminstats">GET /api/admin/stats</h3>
+<p>Response shape:</p>
+<pre><code class="language-json">{
+  "totalUsers": 0,
+  "activeUsers": 0,
+  "proUsers": 0,
+  "postGenerations": 0,
+  "imageGenerations": 0,
+  "intents": { "pro": 0, "student": 0, "total": 0 },
+  "conversionRate": 0
+}</code></pre>
+<p>Access:</p>
+<ul>
+<li>Firebase auth required.</li>
+<li>User email must be in <code>ADMIN_EMAILS</code>.</li>
+</ul>
+<p>Rate limits: none.</p>
+<h3 id="get-apiadminusers">GET /api/admin/users</h3>
+<p>Response shape:</p>
+<pre><code class="language-json">{ "users": [] }</code></pre>
+<p>Each item includes <code>uid</code>, <code>email</code>, <code>displayName</code>, <code>isPro</code>, <code>planType</code>, <code>createdAt</code>, and <code>postsAnalyzed</code>.</p>
+<p>Access:</p>
+<ul>
+<li>Firebase auth required.</li>
+<li>Admin email allowlist required.</li>
+</ul>
+<h3 id="get-apiadminusersuseridposts">GET /api/admin/users/:userId/posts</h3>
+<p>Response shape:</p>
+<pre><code class="language-json">{ "userId": "string", "postCount": 0, "posts": [] }</code></pre>
+<p>Access:</p>
+<ul>
+<li>Firebase auth required.</li>
+<li>Admin email allowlist required.</li>
+</ul>
+<h3 id="get-apiadminuser-data">GET /api/admin/user-data</h3>
+<p>Response shape:</p>
+<pre><code class="language-json">{ "totalUsers": 0, "users": [] }</code></pre>
+<p>This endpoint returns the newest 50 users with up to 10 recent posts each.</p>
+<p>Access:</p>
+<ul>
+<li>Firebase auth required.</li>
+<li>Admin email allowlist required.</li>
+</ul>
+<h3 id="delete-apiadminusersuserid">DELETE /api/admin/users/:userId</h3>
+<p>Response shape:</p>
+<pre><code class="language-json">{ "success": true, "message": "User ... completely deleted" }</code></pre>
+<p>Behavior:</p>
+<ul>
+<li>Deletes the Firestore user document.</li>
+<li>Deletes Firestore posts owned by that user.</li>
+<li>Attempts to delete the Firebase Auth user.</li>
+</ul>
+<p>Access:</p>
+<ul>
+<li>Firebase auth required.</li>
+<li>Admin email allowlist required.</li>
+</ul>
+<h3 id="important-api-gap">Important API gap</h3>
+<p>The admin SPA currently tries to fetch <code>/api/admin/feedback</code> and <code>/api/admin/errors</code>, but the backend does not implement those endpoints in the current snapshot. Those tabs will stay empty or fail quietly until the routes are added.</p>
+<h2 id="6-data-models">6. DATA MODELS</h2>
+<p>The running product uses Firestore collections for live state and Mongoose schemas for the legacy layer.</p>
+<h3 id="live-firestore-collections">Live Firestore collections</h3>
+<h4 id="users"><code>users</code></h4>
+<div class="table-wrap"><table><thead><tr><th>Field</th><th>Type</th><th>Required</th><th>Default</th><th>Why it exists</th></tr></thead><tbody><tr><td><code>email</code></td><td>string</td><td>yes after auth</td><td>none</td><td>Identity and payment lookup.</td></tr><tr><td><code>displayName</code></td><td>string</td><td>no</td><td>empty string or provider value</td><td>UI display in the dashboard.</td></tr><tr><td><code>photoURL</code></td><td>string</td><td>no</td><td>none</td><td>Avatar in the sidebar.</td></tr><tr><td><code>createdAt</code></td><td>timestamp</td><td>yes on first sign-in</td><td>server timestamp</td><td>Account creation time.</td></tr><tr><td><code>freeGenerationsUsed</code></td><td>number</td><td>no</td><td>0</td><td>Enforces the free AI cap.</td></tr><tr><td><code>isPro</code></td><td>boolean</td><td>no</td><td>false</td><td>Subscription state used by the gate.</td></tr><tr><td><code>planType</code></td><td>string</td><td>no</td><td><code>free</code></td><td><code>free</code>, <code>student</code>, or <code>pro</code>.</td></tr><tr><td><code>planActivatedAt</code></td><td>timestamp</td><td>no</td><td>null</td><td>Subscription activation audit trail.</td></tr><tr><td><code>planExpiresAt</code></td><td>timestamp</td><td>no</td><td>null</td><td>Subscription expiry check.</td></tr><tr><td><code>instamojoPaymentId</code></td><td>string</td><td>no</td><td>null</td><td>Links payment records to the account.</td></tr><tr><td><code>voiceProfile</code></td><td>object</td><td>no</td><td>null</td><td>Style memory derived from approved/rejected drafts.</td></tr><tr><td><code>updatedAt</code></td><td>timestamp</td><td>no</td><td>server timestamp</td><td>Last profile or billing update.</td></tr></tbody></table></div>
+<p>Why it exists: this document is the authority for auth, plan status, usage accounting, and style memory.</p>
+<h4 id="posts"><code>posts</code></h4>
+<div class="table-wrap"><table><thead><tr><th>Field</th><th>Type</th><th>Required</th><th>Default</th><th>Why it exists</th></tr></thead><tbody><tr><td><code>userId</code></td><td>string</td><td>yes</td><td>none</td><td>Ownership and per-user filtering.</td></tr><tr><td><code>topic</code></td><td>string</td><td>yes</td><td>none</td><td>Original event or topic.</td></tr><tr><td><code>audience</code></td><td>string</td><td>yes</td><td>none</td><td>Used for prompt conditioning and analytics.</td></tr><tr><td><code>tone</code></td><td>string</td><td>yes</td><td>none</td><td>Used for prompt conditioning.</td></tr><tr><td><code>content</code></td><td>string</td><td>yes</td><td>none</td><td>Current draft text.</td></tr><tr><td><code>history</code></td><td>array</td><td>yes</td><td>empty array</td><td>Version history for undo/revert.</td></tr><tr><td><code>hashtags</code></td><td>string[]</td><td>no</td><td>empty array</td><td>Copy-ready tags and hashtag controls.</td></tr><tr><td><code>bestPostingTime</code></td><td>object</td><td>no</td><td>null</td><td>Suggested timing.</td></tr><tr><td><code>copiedAt</code></td><td>timestamp</td><td>no</td><td>null</td><td>Triggers the 24-hour performance review prompt.</td></tr><tr><td><code>performance</code></td><td>string</td><td>no</td><td>null</td><td>User rating of the copied post.</td></tr><tr><td><code>createdAt</code></td><td>timestamp</td><td>yes</td><td>server timestamp</td><td>Post creation time.</td></tr><tr><td><code>updatedAt</code></td><td>timestamp</td><td>yes</td><td>server timestamp</td><td>Last edit time.</td></tr></tbody></table></div>
+<p>Why it exists: the editor is stateful, and this collection keeps the post durable across refreshes.</p>
+<h4 id="analytics"><code>analytics</code></h4>
+<div class="table-wrap"><table><thead><tr><th>Field</th><th>Type</th><th>Required</th><th>Default</th><th>Why it exists</th></tr></thead><tbody><tr><td><code>type</code></td><td>string</td><td>yes</td><td>none</td><td><code>post-generated</code>, <code>image-generated</code>, or <code>intent</code>.</td></tr><tr><td><code>userId</code></td><td>string</td><td>yes</td><td>none</td><td>User-level attribution.</td></tr><tr><td><code>plan</code></td><td>string</td><td>only for intent events</td><td>none</td><td>Tracks which plan users click.</td></tr><tr><td><code>timestamp</code></td><td>server timestamp</td><td>yes</td><td>server timestamp</td><td>Time-series analysis.</td></tr></tbody></table></div>
+<p>Why it exists: the admin dashboard counts generations and pricing interest from this collection.</p>
+<h3 id="legacy-mongodb-schemas">Legacy MongoDB schemas</h3>
+<h4 id="user-model">User model</h4>
+<div class="table-wrap"><table><thead><tr><th>Field</th><th>Type</th><th>Required</th><th>Default</th><th>Why it exists</th></tr></thead><tbody><tr><td><code>userId</code></td><td>string</td><td>yes</td><td>none</td><td>Stable unique key.</td></tr><tr><td><code>email</code></td><td>string</td><td>no</td><td>null</td><td>Optional contact info.</td></tr><tr><td><code>name</code></td><td>string</td><td>no</td><td>null</td><td>Display name.</td></tr><tr><td><code>linkedinUrl</code></td><td>string</td><td>no</td><td>null</td><td>Early profile metadata.</td></tr><tr><td><code>plan</code></td><td>enum <code>free</code>/<code>pro</code></td><td>no</td><td><code>free</code></td><td>Legacy plan state.</td></tr><tr><td><code>postsToday</code></td><td>number</td><td>no</td><td>0</td><td>Daily usage counter.</td></tr><tr><td><code>iterationsToday</code></td><td>number</td><td>no</td><td>0</td><td>Daily iteration counter.</td></tr><tr><td><code>totalPostsEver</code></td><td>number</td><td>no</td><td>0</td><td>Lifetime usage counter.</td></tr><tr><td><code>totalIterationsEver</code></td><td>number</td><td>no</td><td>0</td><td>Lifetime iteration counter.</td></tr><tr><td><code>lastActiveAt</code></td><td>Date</td><td>no</td><td>now</td><td>Activity tracking.</td></tr><tr><td><code>dailyResetAt</code></td><td>Date</td><td>no</td><td>next midnight</td><td>Used for calendar-day resets.</td></tr><tr><td><code>registeredAt</code></td><td>Date</td><td>no</td><td>now</td><td>First-seen timestamp.</td></tr></tbody></table></div>
+<p>Why it exists: this is the original persistence model for usage tracking and account lifecycle. It is still present, but the live routes do not use it.</p>
+<h4 id="feedback-model">Feedback model</h4>
+<div class="table-wrap"><table><thead><tr><th>Field</th><th>Type</th><th>Required</th><th>Default</th><th>Why it exists</th></tr></thead><tbody><tr><td><code>userId</code></td><td>string</td><td>yes</td><td>none</td><td>Feedback attribution.</td></tr><tr><td><code>type</code></td><td>enum</td><td>yes</td><td>none</td><td><code>bug</code>, <code>feature</code>, <code>love</code>, <code>hate</code>, <code>suggestion</code>.</td></tr><tr><td><code>message</code></td><td>string</td><td>yes</td><td>none</td><td>The actual user report.</td></tr><tr><td><code>rating</code></td><td>number 1-5</td><td>yes</td><td>none</td><td>Fast sentiment score.</td></tr><tr><td><code>page</code></td><td>string</td><td>no</td><td><code>unknown</code></td><td>Where the feedback came from.</td></tr><tr><td><code>submittedAt</code></td><td>Date</td><td>no</td><td>now</td><td>Time ordering.</td></tr></tbody></table></div>
+<p>Why it exists: product feedback storage for the legacy layer.</p>
+<h4 id="errorlog-model">ErrorLog model</h4>
+<div class="table-wrap"><table><thead><tr><th>Field</th><th>Type</th><th>Required</th><th>Default</th><th>Why it exists</th></tr></thead><tbody><tr><td><code>timestamp</code></td><td>Date</td><td>no</td><td>now</td><td>Sort and TTL anchor.</td></tr><tr><td><code>route</code></td><td>string</td><td>yes</td><td>none</td><td>Which endpoint failed.</td></tr><tr><td><code>method</code></td><td>string</td><td>yes</td><td>none</td><td>HTTP method.</td></tr><tr><td><code>error</code></td><td>string</td><td>yes</td><td>none</td><td>Failure message.</td></tr><tr><td><code>userId</code></td><td>string</td><td>no</td><td>null</td><td>Optional user context.</td></tr><tr><td><code>statusCode</code></td><td>number</td><td>yes</td><td>none</td><td>Severity and response class.</td></tr></tbody></table></div>
+<p>TTL: older than 30 days are automatically deleted.</p>
+<p>Why it exists: low-retention operational logging for the legacy monitor path.</p>
+<h2 id="7-gemini-prompt-engineering">7. GEMINI PROMPT ENGINEERING</h2>
+<h3 id="the-synthesize-prompt">The synthesize prompt</h3>
+<p><code>backend/services/aiService.ts</code> builds a long natural-language instruction block around the user's topic and takeaway. The important part is not the length; it is the ordering:</p>
+<ol>
+<li>State the content as a LinkedIn post, not a generic essay.</li>
+<li>Make the takeaway the core message.</li>
+<li>Inject the audience, tone, and optional voice profile.</li>
+<li>Enforce formatting rules around bold text, line breaks, emoji count, and length.</li>
+<li>Ban generic AI filler words.</li>
+<li>Require 4-7 hashtags in the prompt text, while the backend separately normalizes the final hashtag count.</li>
+</ol>
+<p>The prompt is intentionally opinionated. It asks for a post that sounds like a human who was there and has a strong stance. It is also opinionated about style: bold hook, short sentences, and a premium feel.</p>
+<p>The prompt is not a strict structured-output contract. The code asks Gemini to behave as if hashtags were a separate field, but the backend does not parse JSON from the model. Instead, it takes the returned text, extracts hashtags with regex, falls back to generated tags when needed, and returns a clean JSON response to the frontend itself.</p>
+<p>That is the actual contract:</p>
+<ul>
+<li>Gemini returns text.</li>
+<li>The backend returns JSON.</li>
+<li>The frontend renders the text and the metadata separately.</li>
+</ul>
+<h3 id="the-iteration-prompt">The iteration prompt</h3>
+<p>The iteration prompt is narrower and more defensive. It tells Gemini:</p>
+<ul>
+<li>edit the existing post, not rewrite the story from scratch,</li>
+<li>do not hallucinate new facts,</li>
+<li>keep the core story and message,</li>
+<li>preserve locked hashtags unless the topic changes dramatically,</li>
+<li>return only the updated post,</li>
+<li>keep the same formatting style.</li>
+</ul>
+<p>This matters because iteration is where semantic drift usually appears. By grounding the prompt in the current content and locked tags, the product can improve style without changing the underlying claim.</p>
+<h3 id="the-banned-words">The banned words</h3>
+<p>The repo currently bans nine filler words in the synthesize prompt, not 25. The exact banned words are:</p>
+<ul>
+<li>delve</li>
+<li>tapestry</li>
+<li>game-changer</li>
+<li>unlock</li>
+<li>supercharge</li>
+<li>navigate</li>
+<li>landscape</li>
+<li>leverage</li>
+<li>foster</li>
+</ul>
+<p>Why each is banned:</p>
+<ul>
+<li>They are generic AI tells.</li>
+<li>They flatten voice into corporate filler.</li>
+<li>They make LinkedIn posts sound interchangeable.</li>
+<li>They do not help a post read like a real person speaking.</li>
+</ul>
+<p>The codebase does not contain a 25-word banned list in this snapshot, so the doc should not pretend it does.</p>
+<h3 id="why-strict-json-matters">Why strict JSON matters</h3>
+<p>The strict JSON idea matters at the backend boundary, not the model boundary. The frontend expects a predictable API payload with <code>result</code>, <code>hashtags</code>, <code>voiceTags</code>, and <code>bestPostingTime</code>. That contract keeps the UI stable even when the model output is messy.</p>
+<p>At the model layer, the implementation is still text-first. The cleanup happens in server code, not in a JSON parser.</p>
+<h3 id="how-hashtagcount-is-passed-and-used">How <code>hashtagCount</code> is passed and used</h3>
+<p><code>hashtagCount</code> is chosen in the editor as <code>3</code>, <code>5</code>, or <code>10</code>, then sent to the backend on both synthesis and iteration calls. The backend normalizes the value, uses it in the Gemini prompt, and then post-processes the final hashtags to meet the target count.</p>
+<p>The count also controls the editor UI: the user sees a direct toggle for 3/5/10, and the output panel preserves that target when a draft is revised.</p>
+<h2 id="8-design-system">8. DESIGN SYSTEM</h2>
+<p>The design system is not a generic shadcn clone. The current snapshot uses a mix of clean tokenized UI for the app shell and a warmer editorial palette on the landing and login surfaces.</p>
+<h3 id="color-palette">Color palette</h3>
+<div class="table-wrap"><table><thead><tr><th>Color</th><th>Hex / token</th><th>Usage rule</th></tr></thead><tbody><tr><td>Cream background</td><td><code>#F5F3EE</code></td><td>Main landing and content-page background.</td></tr><tr><td>Soft cream</td><td><code>#FAFAF8</code></td><td>Login and neutral white-space surfaces.</td></tr><tr><td>Ink</td><td><code>#0F0F0F</code> / <code>#111216</code> / <code>#17181D</code></td><td>Headings, dark hero panels, and contrast text.</td></tr><tr><td>Clay accent</td><td><code>#D4522A</code></td><td>Primary CTA, links, and editorial highlights.</td></tr><tr><td>Sand accent</td><td><code>#E9DDC7</code> / <code>#FFD8B4</code> / <code>#FFD2A8</code></td><td>Secondary accents and hover states.</td></tr><tr><td>Token primary</td><td><code>oklch(0.488 0.15 264.376)</code></td><td>App-level primary button and focus color.</td></tr><tr><td>Token dark primary</td><td><code>oklch(0.6 0.15 264.376)</code></td><td>Dark-mode primary token.</td></tr></tbody></table></div>
+<p>Usage rules:</p>
+<ul>
+<li>Use cream and ink for brand surfaces.</li>
+<li>Use clay for the main CTA only; do not spread it everywhere.</li>
+<li>Keep blue as a functional UI token, not the visual identity of the whole product.</li>
+<li>Use sand as a supporting warm accent, not as body text.</li>
+</ul>
+<h3 id="typography">Typography</h3>
+<ul>
+<li>The app shell uses Geist Variable via the CSS theme tokens.</li>
+<li>The landing and login pages intentionally switch to a serif/editorial headline treatment with Georgia italic for the brand voice and system sans for body copy.</li>
+<li>Monospace labels are used for metadata, timestamps, and utility labels in the landing/login experience.</li>
+</ul>
+<p>Why this mix exists: PostAura is not trying to look like a finance dashboard. It wants to feel like an editorial workbench for creators. Serif headlines make the product feel more human; sans body text keeps the app readable.</p>
+<h3 id="component-patterns">Component patterns</h3>
+<ul>
+<li><code>premium-action-card</code> is used for action choices in the editor.</li>
+<li><code>premium-cta</code> is used for the primary action button across the app shell.</li>
+<li><code>premium-panel</code> gives the editor surface a glassy, elevated container.</li>
+<li>Base UI primitives from <code>@base-ui/react</code> keep buttons, inputs, tabs, selects, and scroll areas consistent.</li>
+<li>Motion is used sparingly but purposefully: landing-page reveals, progress bars, loading overlays, and panel entrance transitions.</li>
+</ul>
+<h3 id="what-was-rejected">What was rejected</h3>
+<p>The repo history shows several design experiments, including a more editorial landing page and redirect-based auth treatment. The current code does not use a navy-gold system, and that is the right call for this product. Navy-gold would push the product toward a conservative corporate aesthetic. PostAura needs to feel warmer and more immediate, so cream + ink + clay is the better decision for the audience and the use case.</p>
+<h2 id="9-features-shipped-in-v1">9. FEATURES SHIPPED IN V1</h2>
+<div class="table-wrap"><table><thead><tr><th>Feature</th><th>What it does</th><th>Why it was built</th><th>When it was added</th><th>Known limitations</th></tr></thead><tbody><tr><td>Google sign-in for the user app</td><td>Authenticates users with Firebase Google OAuth and bootstraps their Firestore document.</td><td>Fastest possible entry into the product.</td><td>2026-04-12 redesign and auth cleanup.</td><td>Google only; no LinkedIn OAuth.</td></tr><tr><td>Dedicated login page</td><td>Gives authenticated and unauthenticated users a separate entry experience.</td><td>Better conversion and clearer flow.</td><td>2026-04-12.</td><td>Still depends on Firebase popups/redirect fallback.</td></tr><tr><td>Landing page</td><td>Explains the product with an editorial cream/ink presentation and live post preview.</td><td>Market the workflow, not just the model.</td><td>2026-04-12.</td><td>Marketing copy is static, not personalized.</td></tr><tr><td>Post synthesis</td><td>Generates a LinkedIn-ready post from topic + takeaway + audience + tone.</td><td>Solve the blank-page problem.</td><td>Present in current v1 baseline.</td><td>Gemini can still produce imperfect structure.</td></tr><tr><td>Voice learning</td><td>Uses approved/rejected posts to shape future drafts.</td><td>Reduce repetition and improve fit.</td><td>Present in current v1 baseline.</td><td>Early training signal is weak until enough posts exist.</td></tr><tr><td>Iteration commands</td><td>Lets users refine the current post without restarting.</td><td>Avoid full rewrites and drift.</td><td>2026-04-10.</td><td>Iteration quality still depends on the original draft.</td></tr><tr><td>Copy-to-LinkedIn formatting</td><td>Converts markdown bold into Unicode bold before clipboard copy.</td><td>LinkedIn does not render markdown.</td><td>2026-04-10.</td><td>Unicode bold is a workaround, not real rich text.</td></tr><tr><td>Version history</td><td>Keeps multiple post versions in Firestore.</td><td>Allow undo and revert.</td><td>Present in current v1 baseline.</td><td>History is local to each post, not cross-post reusable.</td></tr><tr><td>Performance review loop</td><td>Prompts the user 24 hours after copy-out to rate the post.</td><td>Capture outcome feedback instead of guessing.</td><td>2026-04-09.</td><td>Depends on the user returning to the app.</td></tr><tr><td>Best posting time suggestion</td><td>Suggests a time window based on audience and past results.</td><td>Add practical value beyond copy generation.</td><td>Present in current v1 baseline.</td><td>It is heuristic, not a statistical model.</td></tr><tr><td>Hashtag count control</td><td>Lets users choose 3, 5, or 10 hashtags.</td><td>Make output more intentional and less spammy.</td><td>Present in current v1 baseline.</td><td>The model can still over-generate; backend trims it.</td></tr><tr><td>AI image generation</td><td>Returns a Pollinations image URL for post visuals.</td><td>Add a visual companion to the written post.</td><td>Present in current v1 baseline.</td><td>Not a proprietary image model; depends on external service.</td></tr><tr><td>Paywall and plan upgrade flow</td><td>Blocks free users after the free cap and routes them to Instamojo.</td><td>Monetization and tiering.</td><td>Present in current v1 baseline.</td><td>Demo mode can bypass payment for testing.</td></tr><tr><td>Weekly momentum tracking</td><td>Shows weekly goal progress in the editor shell.</td><td>Encourage consistency.</td><td>Present in current v1 baseline.</td><td>It is a motivation layer, not a scheduler.</td></tr><tr><td>Admin dashboard</td><td>Shows usage, users, intents, and deletion actions.</td><td>Internal monitoring and support.</td><td>2026-04-12 admin/dashboard v2.</td><td>Feedback and error tabs are not backed by API routes yet.</td></tr></tbody></table></div>
+<h2 id="10-bugs-fixed-in-v1">10. BUGS FIXED IN V1</h2>
+<div class="table-wrap"><table><thead><tr><th>Date fixed</th><th>What broke</th><th>Why it broke</th><th>How it was fixed</th></tr></thead><tbody><tr><td>2026-04-12</td><td>Render deployment failed at startup.</td><td>The root package did not expose <code>mongoose</code> where the Render runtime expected it.</td><td>Added <code>mongoose</code> to the root dependencies so <code>tsx backend/server.ts</code> could resolve the DB layer.</td></tr><tr><td>2026-04-12</td><td>Firebase config showed up in tracking.</td><td>A tracked file exposed client config that should not have been committed.</td><td>Removed the exposed config from tracking.</td></tr><tr><td>2026-04-09</td><td>Admin users table was empty.</td><td>The query shape and ordering constraints did not match the available indexes.</td><td>Removed the user-level <code>orderBy</code> constraint and relied on the safer query path.</td></tr><tr><td>2026-04-09</td><td>Admin users were not displaying correctly and user deletion was missing.</td><td>The admin dashboard depended on data paths that were not stable enough.</td><td>Fixed the display path and added deletion support.</td></tr><tr><td>2026-04-09</td><td>Performance review states were not visible / feedback looked wrong.</td><td>The UI and data wiring did not correctly expose the rating state.</td><td>Added review success feedback and fixed the performance visibility path.</td></tr><tr><td>2026-04-10</td><td>Clipboard copy preserved markdown stars instead of LinkedIn-friendly text.</td><td>LinkedIn does not render markdown bold.</td><td>Converted <code><strong>bold</strong></code> into Unicode bold before clipboard copy.</td></tr><tr><td>2026-04-07</td><td>Production auth felt brittle and internal errors leaked too much.</td><td>The initial auth and error surfaces were too noisy.</td><td>Improved auth UX and hid internal error details from clients.</td></tr><tr><td>2026-04-06</td><td>Production CORS blocked deployed frontends.</td><td>The whitelist did not include the live frontend/admin origins.</td><td>Added production URLs to the CORS allowlist.</td></tr></tbody></table></div>
+<h2 id="11-decisions-log">11. DECISIONS LOG</h2>
+<div class="table-wrap"><table><thead><tr><th>Date</th><th>Decision</th><th>Why</th><th>Alternatives rejected</th></tr></thead><tbody><tr><td>Pre-repo / not verifiable in current history</td><td>PostLab → PostAura rename</td><td>The current snapshot already uses PostAura everywhere user-facing. The earlier PostLab label is not present in the accessible git history, so I cannot assign a reliable commit date.</td><td>Pretending the rename is recoverable from this repo snapshot.</td></tr><tr><td>2026-04-12</td><td>Darker UI experiments gave way to the cream + ink editorial system</td><td>The product needed to feel warmer, more human, and less like a generic SaaS dashboard.</td><td>Navy/gold, finance-style dark UIs, and saturated neon systems.</td></tr><tr><td>2026-04-12</td><td>Google-only auth for the user app</td><td>Fast onboarding and a small trust surface.</td><td>LinkedIn OAuth, email/password for end users, or multi-provider auth.</td></tr><tr><td>2026-04-12</td><td>Redirect auth was introduced as a fallback path</td><td>Popup flows can fail or be blocked in browser contexts. The current code still uses popup first and redirect when needed.</td><td>Popup-only sign-in.</td></tr><tr><td>2026-04-12</td><td>In-memory usage tracking was replaced by persisted state</td><td>Reboots must not lose posts, plan status, or feedback.</td><td>Pure in-memory state, Redis-only, or a client-side store.</td></tr><tr><td>2026-04-12</td><td>MongoDB remained in the backend boot path</td><td>The repository already carried Mongoose models and the backend expects a real DB on startup.</td><td>Removing the DB boot path before the legacy services were retired.</td></tr><tr><td>2026-04-12</td><td>Render for backend deployment</td><td>Simple web-service deployment, health checks, and environment-variable support.</td><td>Serverless functions and a more complex hosting split.</td></tr><tr><td>2026-04-06 to 2026-04-12</td><td>Netlify over Vercel for static frontends</td><td>The app is two static SPAs and Netlify handles rewrite-based hosting cleanly.</td><td>A monolithic Vercel deployment.</td></tr><tr><td>2026-04-10</td><td>Copy-to-clipboard converts markdown bold to Unicode bold</td><td>LinkedIn ignores markdown formatting.</td><td>Leaving raw markdown in the clipboard.</td></tr><tr><td>2026-04-09</td><td>Admin dashboard uses Firestore-backed stats and user actions</td><td>The admin product needed real-time usage and deletion tools.</td><td>Building the dashboard on top of the legacy MongoDB-only services.</td></tr></tbody></table></div>
+<h2 id="12-environment-variables">12. ENVIRONMENT VARIABLES</h2>
+<h3 id="frontend-env">Frontend .env</h3>
+<div class="table-wrap"><table><thead><tr><th>Name</th><th>Where used</th><th>How to get it</th><th>Example format</th></tr></thead><tbody><tr><td><code>VITE_API_URL</code></td><td><code>frontend/src/lib/api.ts</code>, <code>frontend/src/lib/gemini.ts</code></td><td>Point at the backend deployment URL or local server.</td><td><code>https://api.example.com</code></td></tr><tr><td><code>VITE_FIREBASE_API_KEY</code></td><td><code>frontend/src/firebase.ts</code></td><td>Firebase project web app config.</td><td><code>AIza...</code></td></tr><tr><td><code>VITE_FIREBASE_AUTH_DOMAIN</code></td><td><code>frontend/src/firebase.ts</code></td><td>Firebase project web app config.</td><td><code>my-app.firebaseapp.com</code></td></tr><tr><td><code>VITE_FIREBASE_PROJECT_ID</code></td><td><code>frontend/src/firebase.ts</code></td><td>Firebase project web app config.</td><td><code>my-project-id</code></td></tr><tr><td><code>VITE_FIREBASE_STORAGE_BUCKET</code></td><td><code>frontend/src/firebase.ts</code></td><td>Firebase project web app config.</td><td><code>my-project.appspot.com</code></td></tr><tr><td><code>VITE_FIREBASE_MESSAGING_SENDER_ID</code></td><td><code>frontend/src/firebase.ts</code></td><td>Firebase project web app config.</td><td><code>1234567890</code></td></tr><tr><td><code>VITE_FIREBASE_APP_ID</code></td><td><code>frontend/src/firebase.ts</code></td><td>Firebase project web app config.</td><td><code>1:123:web:abc123</code></td></tr><tr><td><code>VITE_FIREBASE_MEASUREMENT_ID</code></td><td><code>frontend/src/firebase.ts</code></td><td>Firebase Analytics config if enabled.</td><td><code>G-XXXXXXXXXX</code></td></tr><tr><td><code>VITE_FIREBASE_FIRESTORE_DATABASE_ID</code></td><td><code>frontend/src/firebase.ts</code></td><td>Only needed if you are not using the default Firestore database.</td><td><code>(default)</code></td></tr><tr><td><code>VITE_ADMIN_EMAILS</code></td><td><code>admin/src/lib/adminAccess.ts</code></td><td>List the admin account emails.</td><td><code>admin@example.com,another@example.com</code></td></tr><tr><td><code>VITE_FRONTEND_URL</code></td><td><code>admin/src/lib/adminAccess.ts</code></td><td>The public user-app URL for dashboard redirects.</td><td><code>https://app.example.com</code></td></tr></tbody></table></div>
+<h3 id="backend-env">Backend .env</h3>
+<div class="table-wrap"><table><thead><tr><th>Name</th><th>Where used</th><th>How to get it</th><th>Example format</th></tr></thead><tbody><tr><td><code>MONGODB_URI</code></td><td><code>backend/config/db.ts</code></td><td>MongoDB Atlas connection string.</td><td><code>mongodb+srv://user:pass@cluster/...</code></td></tr><tr><td><code>GEMINI_API_KEY</code></td><td><code>backend/services/aiService.ts</code></td><td>Google AI Studio API key.</td><td><code>AIza...</code></td></tr><tr><td><code>POLLINATIONS_API_KEY</code></td><td><code>backend/services/aiService.ts</code></td><td>Optional Pollinations key if you want signed image URLs.</td><td><code>pollinations_...</code></td></tr><tr><td><code>FIREBASE_PROJECT_ID</code></td><td><code>backend/services/firebaseAdmin.ts</code></td><td>Firebase service account project id.</td><td><code>my-project-id</code></td></tr><tr><td><code>FIREBASE_CLIENT_EMAIL</code></td><td><code>backend/services/firebaseAdmin.ts</code></td><td>Firebase service account client email.</td><td><code>firebase-adminsdk-...@...</code></td></tr><tr><td><code>FIREBASE_PRIVATE_KEY</code></td><td><code>backend/services/firebaseAdmin.ts</code></td><td>Firebase service account private key.</td><td><code>-----BEGIN PRIVATE KEY-----...</code></td></tr><tr><td><code>ADMIN_EMAILS</code></td><td><code>backend/routes/admin.ts</code></td><td>Email allowlist for admin access.</td><td><code>admin@example.com,owner@example.com</code></td></tr><tr><td><code>INSTAMOJO_API_KEY</code></td><td><code>backend/routes/payment.ts</code></td><td>Instamojo dashboard credentials.</td><td><code>...</code></td></tr><tr><td><code>INSTAMOJO_AUTH_TOKEN</code></td><td><code>backend/routes/payment.ts</code></td><td>Instamojo dashboard credentials.</td><td><code>...</code></td></tr><tr><td><code>INSTAMOJO_SALT</code></td><td><code>backend/routes/payment.ts</code></td><td>Instamojo webhook secret.</td><td><code>...</code></td></tr><tr><td><code>INSTAMOJO_ENV</code></td><td><code>backend/routes/payment.ts</code></td><td>Choose <code>test</code> or <code>live</code>.</td><td><code>test</code></td></tr><tr><td><code>FRONTEND_URL</code></td><td><code>backend/routes/payment.ts</code></td><td>Public user-app URL for payment redirects.</td><td><code>https://app.example.com</code></td></tr><tr><td><code>BACKEND_URL</code></td><td><code>backend/routes/payment.ts</code></td><td>Public API URL used in the webhook payload.</td><td><code>https://api.example.com</code></td></tr><tr><td><code>PORT</code></td><td><code>backend/server.ts</code></td><td>Render or local runtime port.</td><td><code>8000</code></td></tr><tr><td><code>DAILY_POST_LIMIT</code></td><td><code>backend/config/env.ts</code>, <code>backend/services/usage.service.ts</code></td><td>Optional usage policy number.</td><td><code>3</code></td></tr><tr><td><code>DAILY_ITER_LIMIT</code></td><td><code>backend/config/env.ts</code>, <code>backend/services/usage.service.ts</code></td><td>Optional usage policy number.</td><td><code>10</code></td></tr><tr><td><code>ADMIN_SECRET</code></td><td>README only; not consumed by current source</td><td>Legacy documentation item. It is not referenced by current runtime code.</td><td><code>...</code></td></tr></tbody></table></div>
+<h2 id="13-deployment-guide">13. DEPLOYMENT GUIDE</h2>
+<h3 id="1-mongodb-atlas-setup">1. MongoDB Atlas setup</h3>
+<ol>
+<li>Create an Atlas cluster and database user.</li>
+<li>Whitelist the Render outbound IPs or allow access from the app environment.</li>
+<li>Copy the connection string into <code>MONGODB_URI</code>.</li>
+<li>Verify the backend can connect on startup, because <code>backend/server.ts</code> calls <code>connectDB()</code> before listening.</li>
+</ol>
+<h3 id="2-firebase-configuration">2. Firebase configuration</h3>
+<ol>
+<li>Create a Firebase project.</li>
+<li>Enable Google sign-in in Authentication.</li>
+<li>Create a web app for the user frontend and a separate web app if you want isolated admin config.</li>
+<li>Add the web app config values to the frontend and admin <code>.env</code> files.</li>
+<li>Create a service account for the backend and copy <code>FIREBASE_PROJECT_ID</code>, <code>FIREBASE_CLIENT_EMAIL</code>, and <code>FIREBASE_PRIVATE_KEY</code> into the backend environment.</li>
+<li>Enable Firestore, because the live app state is stored there.</li>
+<li>Add all deployed domains to Firebase Auth authorized domains.</li>
+</ol>
+<h3 id="3-render-backend-deployment">3. Render backend deployment</h3>
+<ol>
+<li>Create a Render web service from the <code>backend</code> folder.</li>
+<li>Use <code>npm install &amp;&amp; npm run build</code> as the build command.</li>
+<li>Use <code>npm run start</code> as the start command.</li>
+<li>Set the backend environment variables from the table above.</li>
+<li>Confirm the health check path is <code>/health</code>.</li>
+<li>Update the backend CORS whitelist if your frontend or admin domains change.</li>
+</ol>
+<h3 id="4-netlify-frontend-deployment">4. Netlify frontend deployment</h3>
+<ol>
+<li>Create a Netlify site from the <code>frontend</code> folder.</li>
+<li>Use <code>npm install &amp;&amp; npm run build</code> as the build command.</li>
+<li>Publish the <code>dist</code> directory.</li>
+<li>Make sure the <code>_redirects</code> and <code>_headers</code> files from <code>frontend/public</code> are included in the deploy output so SPA routing works.</li>
+<li>Set <code>VITE_API_URL</code> to the Render backend URL.</li>
+<li>Set all Firebase web config values.</li>
+</ol>
+<h3 id="5-admin-deployment">5. Admin deployment</h3>
+<ol>
+<li>Create a second static site for the <code>admin</code> folder.</li>
+<li>Use the same build/publish pattern as the main frontend.</li>
+<li>Set <code>VITE_API_URL</code> to the backend URL.</li>
+<li>Set <code>VITE_FRONTEND_URL</code> to the public user-app URL.</li>
+<li>Set <code>VITE_ADMIN_EMAILS</code> to the admin allowlist.</li>
+</ol>
+<h3 id="6-environment-variables-setup">6. Environment variables setup</h3>
+<ol>
+<li>Keep secrets only in the hosting provider environment, not in the repo.</li>
+<li>Never expose Firebase private keys or Instamojo secrets to the browser bundle.</li>
+<li>Set <code>FRONTEND_URL</code> and <code>BACKEND_URL</code> consistently so payment redirects and webhooks resolve correctly.</li>
+</ol>
+<h3 id="7-custom-domain-setup">7. Custom domain setup</h3>
+<ol>
+<li>Point the user app domain at the frontend static host.</li>
+<li>Point the admin domain at the admin static host.</li>
+<li>Point the API domain at Render.</li>
+<li>Add all three hostnames to the backend CORS allowlist.</li>
+<li>Add the final domains to Firebase Auth authorized domains.</li>
+</ol>
+<h2 id="14-known-limitations-in-v1">14. KNOWN LIMITATIONS IN V1</h2>
+<ul>
+<li>The free tier is a 5-action cap enforced by <code>checkUsage</code>, not a true subscription-aware quota system.</li>
+<li>The current AI paths use Firestore for live state even though the backend still boots MongoDB and keeps Mongoose models in the repository.</li>
+<li>The <code>usage.service.ts</code>, <code>monitor.service.ts</code>, and <code>user.service.ts</code> files are legacy/alternate persistence layers and are not wired to the live API routes.</li>
+<li>The admin SPA currently tries to fetch <code>/api/admin/feedback</code> and <code>/api/admin/errors</code>, but those endpoints do not exist in the current backend snapshot.</li>
+<li>LinkedIn posting is still copy/paste, not direct publish.</li>
+<li>Image generation is a generated URL from Pollinations, not a first-party model or upload pipeline.</li>
+<li>Payment demo mode can bypass the real checkout flow by design.</li>
+<li>Voice learning is shallow at low sample counts; it gets better only after the user has enough approved/rejected posts.</li>
+<li>The AI can still drift, especially on long iteration chains, because all model output is probabilistic.</li>
+<li>There is no team/workspace model, no scheduling queue, and no collaborative review workflow.</li>
+</ul>
+<p>Which limitations are planned for v2:</p>
+<ul>
+<li>Unified persistence and usage accounting.</li>
+<li>Proper admin telemetry endpoints for feedback and error logs.</li>
+<li>Better voice-memory controls and reset tools.</li>
+<li>A real publish/export pipeline.</li>
+<li>Stronger billing and subscription lifecycle handling.</li>
+</ul>
+<h2 id="15-v2-roadmap">15. V2 ROADMAP</h2>
+<p>Priority order:</p>
+<ol>
+<li>Unify the data layer.</li>
+<p>- Why v2: the current hybrid Firestore/MongoDB state works, but it is not clean enough to be the final operating model.</p>
+</ol>
+<ol>
+<li>Add the missing admin APIs.</li>
+<p>- Why v2: the UI already exposes feedback and error tabs, but the backend does not. That gap should be closed before expanding features.</p>
+</ol>
+<ol>
+<li>Strengthen plan management and billing.</li>
+<p>- Why v2: v1 proves demand; v2 should make subscription status, expiry, and recovery more explicit.</p>
+</ol>
+<ol>
+<li>Add better voice controls and reset tools.</li>
+<p>- Why v2: voice learning is valuable, but users should be able to inspect, correct, or reset it.</p>
+</ol>
+<ol>
+<li>Add real LinkedIn export or publish support.</li>
+<p>- Why v2: v1 intentionally stops at copy/paste to keep scope and risk down.</p>
+</ol>
+<ol>
+<li>Add scheduling and queueing.</li>
+<p>- Why v2: timing advice is already in the product, but real scheduling is a larger operational problem.</p>
+</ol>
+<ol>
+<li>Expand creator workflows.</li>
+<p>- Why v2: teams, reusable templates, multi-post sequences, and content libraries are useful once the core post flow is stable.</p>
+</ol>
+<ol>
+<li>Improve analytics and post-performance intelligence.</li>
+<p>- Why v2: current metrics are enough to guide the product, but not enough to run a serious optimization loop.</p>
+</ol>
+<p>The reason these stay out of v1 is simple: v1 had to prove that the core job-to-be-done is real. It did not need every adjacent platform feature. The shipped product is intentionally narrow: capture thought, generate post, refine, copy, learn.</p>
+<h2 id="16-positioning-qa-hinglish-english">16. POSITIONING Q&amp;A (HINGLISH + ENGLISH)</h2>
+<h3 id="q1-kya-user-3-second-me-samajh-paega-ki-product-kya-deta-hai">Q1) Kya user 3 second me samajh paega ki product kya deta hai?</h3>
+<ul>
+<li>Hinglish: Haan, agar message direct ho: "Bas 1-2 line daalo, PostAura use tumhari awaaz me ready-to-post bana deta hai, taaki tum bina overthinking roz LinkedIn par dikho."</li>
+<li>English: Yes, if the message is direct: "Drop 1-2 lines, and PostAura turns them into a ready-to-post draft in your voice so you show up on LinkedIn daily without overthinking."</li>
+</ul>
+<h3 id="q2-kya-ye-chatgpt-jaisa-generic-lagega">Q2) Kya ye ChatGPT jaisa generic lagega?</h3>
+<ul>
+<li>Hinglish: Generic tab lagega jab copy sirf speed ya AI bole. Differentiation tab aata hai jab product clear kare ki yeh daily posting habit aur voice consistency system hai, sirf one-off text output nahi.</li>
+<li>English: It feels generic when copy only promises speed or AI. Differentiation appears when the product clearly positions itself as a daily consistency and voice system, not a one-off text output tool.</li>
+</ul>
+<h3 id="q3-sabse-strong-positioning-focus-kya-hona-chahiye-speed-voice-ya-growth">Q3) Sabse strong positioning focus kya hona chahiye: speed, voice, ya growth?</h3>
+<ul>
+<li>Hinglish: Primary narrative consistency hona chahiye, kyunki real user pain "aaj kya post karun" aur "skip ho jata hai" hai. Speed aur voice supporting proofs hone chahiye.</li>
+<li>English: Consistency should lead the narrative, because the real pain is "what do I post today" and "I keep skipping." Speed and voice should support that claim as proof points.</li>
+</ul>
+<h3 id="q4-edit-ready-ya-ready-to-post-me-kya-choose-karna-chahiye">Q4) "Edit-ready" ya "ready-to-post" me kya choose karna chahiye?</h3>
+<ul>
+<li>Hinglish: "Ready-to-post" choose karo. "Edit-ready" user ko extra kaam ka signal deta hai aur conversion friction badhata hai.</li>
+<li>English: Choose "ready-to-post." "Edit-ready" signals extra work and creates conversion friction.</li>
+</ul>
+<h3 id="q5-moment-takeaway-phrase-use-karni-chahiye">Q5) "Moment + takeaway" phrase use karni chahiye?</h3>
+<ul>
+<li>Hinglish: Hero copy me avoid karo, kyunki "takeaway" cognitive load badhata hai. Input ko effortless dikhao: "Bas 1-2 line daalo."</li>
+<li>English: Avoid it in hero copy because "takeaway" adds cognitive load. Make input feel effortless: "Drop 1-2 lines."</li>
+</ul>
+<h3 id="q6-product-ki-reality-kya-hai-direct-publish-ya-copy-flow">Q6) Product ki reality kya hai: direct publish ya copy flow?</h3>
+<ul>
+<li>Hinglish: Current reality copy-to-LinkedIn flow hai, direct auto-publish nahi. Isliye promise honest hona chahiye: "ready-to-post output" and "paste to publish."</li>
+<li>English: Current reality is a copy-to-LinkedIn flow, not direct auto-publish. So the promise should stay honest: "ready-to-post output" and "paste to publish."</li>
+</ul>
+<h3 id="q7-user-objection-maine-5-tools-try-kiye-sab-same-lagte-hain-ka-response-kya-ho">Q7) User objection: "Maine 5 tools try kiye, sab same lagte hain" ka response kya ho?</h3>
+<ul>
+<li>Hinglish: "Hum random prompt tool nahi hain. Hum daily thought ko publishable format me lock karte hain, tumhari awaaz learn karte hain, aur posting streak tootne nahi dete."</li>
+<li>English: "We are not a random prompt tool. We lock daily thoughts into a publishable format, learn your voice over time, and prevent your posting streak from breaking."</li>
+</ul>
+<h3 id="q8-final-one-line-positioning-sentence-kya-rahegi">Q8) Final one-line positioning sentence kya rahegi?</h3>
+<ul>
+<li>Hinglish: "Bas 1-2 line daalo, PostAura use tumhari awaaz me ready-to-post bana deta hai, taaki tum bina overthinking roz LinkedIn par dikho."</li>
+<li>English: "Drop 1-2 lines, and PostAura turns them into a ready-to-post post in your voice so you can show up on LinkedIn daily without overthinking."</li>
+</ul>
+      <div class="meta">Generated from POSTAURA_V1.md on 4/15/2026, 12:42:36 AM</div>
+    </main>
+  </div>
+</body>
+</html>

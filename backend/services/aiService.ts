@@ -57,6 +57,7 @@ export async function synthesizePost(
   audience: string,
   tone: string,
   voiceProfile?: any,
+  hashtagCount = 5,
 ): Promise<string> {
   if (!ai) {
     throw new Error("AI service is not configured. GEMINI_API_KEY is missing.");
@@ -135,8 +136,28 @@ export async function synthesizePost(
     6. Sound like a real person who was THERE and has a STRONG OPINION, not an AI summarizing a topic.
     7. Write in first person. The author experienced this.
     8. The hook should be PROVOCATIVE — make someone stop scrolling. Lead with the opinion, not the event.
-    9. Do not include hashtags unless specifically asked.
-    10. The overall feel should be PREMIUM — like a post from someone with 50K followers, not a beginner. Confident, bold, expressive.
+     9. ALWAYS include 4-7 highly relevant hashtags at the end of the post.
+       - Make them specific to topic + audience (avoid generic spam tags)
+       - Keep hashtags on the final line(s), clean and readable
+     10. The overall feel should be PREMIUM — like a post from someone with 50K followers, not a beginner. Confident, bold, expressive.
+
+    Also generate exactly ${hashtagCount} hashtags.
+    Mix three types equally:
+    - Niche: specific to the post topic
+    - Audience: matching who will read this (founders, students, developers, CEOs etc)
+    - Trending: currently active on LinkedIn
+
+    Return hashtags as a separate JSON field:
+    hashtags: string[]
+
+    Each hashtag must:
+    - Start with #
+    - Be one word or camelCase
+    - Be relevant, not generic
+    - NEVER include: #LinkedIn #Post #Content
+
+    Example for a tech founder post:
+    ['#BuildInPublic', '#FounderLife', '#StartupIndia', '#TechFounders', '#IndianStartups']
   `;
 
   return callWithRetryAndFallback(async (model) => {
@@ -152,7 +173,12 @@ export async function synthesizePost(
   });
 }
 
-export async function iteratePost(currentContent: string, instruction: string): Promise<string> {
+export async function iteratePost(
+  currentContent: string,
+  instruction: string,
+  existingHashtags: string[] = [],
+  hashtagCount = 5,
+): Promise<string> {
   if (!ai) {
     throw new Error("AI service is not configured. GEMINI_API_KEY is missing.");
   }
@@ -166,13 +192,17 @@ export async function iteratePost(currentContent: string, instruction: string): 
     """
     
     Instruction for iteration: ${instruction}
+    Current locked hashtags:
+    ${existingHashtags.join(" ")}
     
     CRITICAL RULES:
     1. Apply the instruction to the current post.
     2. DO NOT hallucinate new facts or change the original core story/message.
     3. DO NOT use robotic fluff words like "delve", "tapestry", "game-changer", "unlock", "supercharge".
     4. Maintain the LinkedIn formatting (Hook, Body, Conclusion, CTA) unless the instruction implies otherwise.
-    5. Return ONLY the updated post content, without any meta-commentary.
+    5. Preserve the same hashtags from Current locked hashtags unless the topic changes dramatically.
+    6. Keep exactly ${hashtagCount} hashtags at the end.
+    7. Return ONLY the updated post content, without any meta-commentary.
   `;
 
   return callWithRetryAndFallback(async (model) => {

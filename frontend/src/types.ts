@@ -11,6 +11,11 @@ export interface HistoryItem {
   timestamp: any; // Firestore Timestamp or Date
 }
 
+export interface GeneratedPost {
+  content: string;
+  hashtags: string[];
+}
+
 export interface Post {
   id?: string;
   userId: string;
@@ -23,4 +28,9 @@ export interface Post {
   updatedAt: any; // Firestore Timestamp
   copiedAt?: any; // When user copied to LinkedIn
   performance?: "hot" | "average" | "flopped" | null; // Post result feedback
+  hashtags?: string[];
+  bestPostingTime?: {
+    label: string;
+    reason: string;
+  } | null;
 }

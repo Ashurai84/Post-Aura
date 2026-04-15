@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { auth, db } from "./firebase";
 import { onAuthStateChanged, User } from "firebase/auth";
-import { collection, query, where, onSnapshot } from "firebase/firestore";
+import { collection, query, where, onSnapshot, deleteDoc, doc, setDoc } from "firebase/firestore";
 import { Sidebar } from "./components/Sidebar";
 import { Editor } from "./components/Editor";
 import { ImageGenerator } from "./components/ImageGenerator";
@@ -26,6 +26,12 @@ function postUpdatedMs(p: Post): number {
   return timestampToMs(p.updatedAt);
 }
 
+function postCreatedOrUpdatedMs(p: Post): number {
+  const createdMs = timestampToMs(p.createdAt);
+  if (createdMs > 0) return createdMs;
+  return postUpdatedMs(p);
+}
+
 function getStartOfWeek(): number {
   const now = new Date();
   const day = now.getDay(); // 0=Sun
@@ -36,15 +42,16 @@ function getStartOfWeek(): number {
 
 const WEEKLY_GOAL = 3;
 
-function Dashboard({ user, posts, activePostId, setActivePostId }: { 
+function Dashboard({ user, posts, activePostId, setActivePostId, onDeletePost }: { 
   user: User, 
   posts: Post[], 
   activePostId: string | null, 
-  setActivePostId: (id: string | null) => void 
+  setActivePostId: (id: string | null) => void,
+  onDeletePost: (id: string) => void,
 }) {
   const activePost = posts.find(p => p.id === activePostId) || null;
   const weekStart = getStartOfWeek();
-  const weeklyPostCount = posts.filter(p => timestampToMs(p.createdAt) >= weekStart).length;
+  const weeklyPostCount = posts.filter(p => postCreatedOrUpdatedMs(p) >= weekStart).length;
   const remainingThisWeek = Math.max(WEEKLY_GOAL - weeklyPostCount, 0);
 
   // Posts copied 24h+ ago without a performance review
@@ -63,6 +70,7 @@ function Dashboard({ user, posts, activePostId, setActivePostId }: {
         activePostId={activePostId} 
         onSelectPost={setActivePostId} 
         onNewPost={() => setActivePostId(null)}
+        onDeletePost={onDeletePost}
         user={user}
       />
       
@@ -89,6 +97,7 @@ function Dashboard({ user, posts, activePostId, setActivePostId }: {
             <Editor 
               post={activePost} 
               userId={user.uid} 
+              onDeletePost={onDeletePost}
               weeklyPostCount={weeklyPostCount}
               weeklyGoal={WEEKLY_GOAL}
               postsToReview={postsToReview}
@@ -115,6 +124,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [posts, setPosts] = useState<Post[]>([]);
   const [activePostId, setActivePostId] = useState<string | null>(null);
+  const [recentlyDeleted, setRecentlyDeleted] = useState<Post | null>(null);
   const isAuthenticated = !!user || !!auth.currentUser;
 
   useEffect(() => {
@@ -148,6 +158,43 @@ export default function App() {
     return () => unsubscribe();
   }, [user]);
 
+  useEffect(() => {
+    if (!recentlyDeleted) return;
+    const timer = window.setTimeout(() => setRecentlyDeleted(null), 5000);
+    return () => window.clearTimeout(timer);
+  }, [recentlyDeleted]);
+
+  const handleDeletePost = async (postId: string) => {
+    const confirmed = window.confirm("Delete this post permanently?");
+    if (!confirmed) return;
+    try {
+      const postToDelete = posts.find((p) => p.id === postId) || null;
+      await deleteDoc(doc(db, "posts", postId));
+      if (activePostId === postId) {
+        setActivePostId(null);
+      }
+      if (postToDelete) {
+        setRecentlyDeleted(postToDelete);
+      }
+    } catch (error) {
+      console.error("Error deleting post:", error);
+      alert("Failed to delete post. Please try again.");
+    }
+  };
+
+  const handleUndoDelete = async () => {
+    if (!recentlyDeleted?.id) return;
+    const { id, ...data } = recentlyDeleted;
+    try {
+      await setDoc(doc(db, "posts", id), data);
+      setActivePostId(id);
+      setRecentlyDeleted(null);
+    } catch (error) {
+      console.error("Error restoring post:", error);
+      alert("Could not restore deleted post.");
+    }
+  };
+
   if (loading) {
     return (
       <div className="h-screen w-screen flex items-center justify-center bg-background">
@@ -166,12 +213,28 @@ export default function App() {
             user={user} 
             posts={posts} 
             activePostId={activePostId} 
-            setActivePostId={setActivePostId} 
+            setActivePostId={setActivePostId}
+            onDeletePost={handleDeletePost}
           />
         ) : <Navigate to="/" replace />} />
         <Route path="/payment/success" element={<PaymentSuccess />} />
         <Route path="/admin" element={<Navigate to="/" replace />} />
       </Routes>
+
+      {recentlyDeleted && (
+        <div className="fixed bottom-5 right-5 z-100 rounded-xl border border-border/70 bg-background/95 backdrop-blur-md shadow-2xl px-4 py-3 flex items-center gap-3 animate-in fade-in slide-in-from-bottom-2 duration-300">
+          <div className="text-sm">
+            <p className="font-medium">Post deleted</p>
+            <p className="text-xs text-muted-foreground truncate max-w-56">{recentlyDeleted.topic || "Untitled Post"}</p>
+          </div>
+          <button
+            onClick={handleUndoDelete}
+            className="h-8 px-3 rounded-lg text-xs font-semibold bg-primary text-primary-foreground hover:opacity-90"
+          >
+            Undo
+          </button>
+        </div>
+      )}
     </BrowserRouter>
   );
 }

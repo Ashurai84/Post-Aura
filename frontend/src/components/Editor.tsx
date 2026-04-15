@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { motion, AnimatePresence } from "motion/react";
 import { Button } from "./ui/button";
 import { Textarea } from "./ui/textarea";
 import { Input } from "./ui/input";
@@ -9,13 +10,15 @@ import {
   Undo2, History as HistoryIcon, Trash2, RotateCcw,
   Zap, Lightbulb, Flame, BookOpen, Trophy,
   ChevronDown, Sparkles, Pencil, Settings2,
-  ThumbsUp, ThumbsDown
+  ThumbsUp, ThumbsDown, Hash, Clock3
 } from "lucide-react";
 import { db, auth } from "../firebase";
 import { doc, updateDoc, setDoc, serverTimestamp, collection } from "firebase/firestore";
 import Markdown from "react-markdown";
 import { PaywallModal } from "./PaywallModal";
 import { getApiBase } from "../lib/api";
+
+const HASHTAG_COUNT_OPTIONS: Array<3 | 5 | 10> = [3, 5, 10];
 
 // ── Quick Actions ──────────────────────────────────────────────
 const QUICK_ACTIONS = [
@@ -72,6 +75,7 @@ interface EditorProps {
   userId: string;
   onPostUpdated: (post: Post) => void;
   onStartNewPost: () => void;
+  onDeletePost: (id: string) => void;
   weeklyPostCount: number;
   weeklyGoal: number;
   postsToReview: Post[];
@@ -79,8 +83,44 @@ interface EditorProps {
 
 type EditorPhase = "select" | "input" | "result";
 
+function toUnicodeBold(text: string): string {
+  let result = "";
+  for (const ch of text) {
+    const code = ch.codePointAt(0);
+    if (code === undefined) {
+      result += ch;
+      continue;
+    }
+
+    if (code >= 65 && code <= 90) {
+      result += String.fromCodePoint(0x1D400 + (code - 65));
+    } else if (code >= 97 && code <= 122) {
+      result += String.fromCodePoint(0x1D41A + (code - 97));
+    } else if (code >= 48 && code <= 57) {
+      result += String.fromCodePoint(0x1D7CE + (code - 48));
+    } else {
+      result += ch;
+    }
+  }
+  return result;
+}
+
+function convertMarkdownBoldToUnicode(text: string): string {
+  // LinkedIn does not render markdown, so convert **bold** to Unicode bold letters for copy-paste.
+  const withUnicodeBold = text.replace(/\*\*([\s\S]+?)\*\*/g, (_, inner: string) => toUnicodeBold(inner));
+  return withUnicodeBold.replace(/\*\*/g, "");
+}
+
+function extractHashtagsFromText(text: string): string[] {
+  const matches = String(text || "").match(/(^|\s)#([A-Za-z][A-Za-z0-9_]{1,29})/g) || [];
+  const normalized = matches
+    .map((m) => m.trim())
+    .map((m) => (m.startsWith("#") ? m : `#${m.replace(/^\s+/, "")}`));
+  return [...new Set(normalized)];
+}
+
 // ── Component ──────────────────────────────────────────────────
-export function Editor({ post, userId, onPostUpdated, onStartNewPost, weeklyPostCount, weeklyGoal, postsToReview }: EditorProps) {
+export function Editor({ post, userId, onPostUpdated, onStartNewPost, onDeletePost, weeklyPostCount, weeklyGoal, postsToReview }: EditorProps) {
   // Core state
   const [phase, setPhase] = useState<EditorPhase>("select");
   const [selectedAction, setSelectedAction] = useState<typeof QUICK_ACTIONS[0] | null>(null);
@@ -108,9 +148,13 @@ export function Editor({ post, userId, onPostUpdated, onStartNewPost, weeklyPost
   const [showFeedbackOptions, setShowFeedbackOptions] = useState(false);
   const [voiceTags, setVoiceTags] = useState<string[]>([]);
   const [postsAnalyzed, setPostsAnalyzed] = useState(0);
+  const [hashtags, setHashtags] = useState<string[]>([]);
+  const [hashtagCount, setHashtagCount] = useState<3 | 5 | 10>(5);
+  const [bestPostingTime, setBestPostingTime] = useState<{ label: string; reason: string } | null>(null);
   const [reviewMessage, setReviewMessage] = useState<string | null>(null);
 
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const prevHashtagCountRef = useRef<3 | 5 | 10>(5);
 
   // ── Sync with post prop ────────────────────────────────────
   useEffect(() => {
@@ -120,6 +164,13 @@ export function Editor({ post, userId, onPostUpdated, onStartNewPost, weeklyPost
       setTone(post.tone || "");
       setContent(post.content || "");
       setHistory(post.history || []);
+      setHashtags(post.hashtags || []);
+      if ((post.hashtags || []).length === 3 || (post.hashtags || []).length === 5 || (post.hashtags || []).length === 10) {
+        setHashtagCount((post.hashtags || []).length as 3 | 5 | 10);
+      } else {
+        setHashtagCount(5);
+      }
+      setBestPostingTime(post.bestPostingTime || null);
       setPhase("result");
     } else {
       // Reset for new post
@@ -135,6 +186,9 @@ export function Editor({ post, userId, onPostUpdated, onStartNewPost, weeklyPost
       setShowAdvanced(false);
       setShowHistory(false);
       setIsEditing(false);
+      setHashtags([]);
+      setHashtagCount(5);
+      setBestPostingTime(null);
     }
   }, [post]);
 
@@ -144,6 +198,36 @@ export function Editor({ post, userId, onPostUpdated, onStartNewPost, weeklyPost
       setTimeout(() => inputRef.current?.focus(), 100);
     }
   }, [phase]);
+
+  // ── Regenerate hashtags when count changes in result phase ──
+  useEffect(() => {
+    if (phase !== "result" || !content || !topic || !audience || !tone) return;
+    if (hashtagCount === prevHashtagCountRef.current) return; // Only regen if count actually changed
+
+    const prevCount = prevHashtagCountRef.current;
+    prevHashtagCountRef.current = hashtagCount;
+
+    const regenerateHashtags = async () => {
+      try {
+        setIsGenerating(true);
+        const { hashtags: newHashtags } = await iteratePost(
+          content,
+          `Change the number of hashtags from ${prevCount} to ${hashtagCount}`,
+          topic,
+          audience,
+          hashtags,
+          hashtagCount
+        );
+        setHashtags(newHashtags || []);
+      } catch (error: any) {
+        console.error("Hashtag regeneration error:", error);
+      } finally {
+        setIsGenerating(false);
+      }
+    };
+
+    regenerateHashtags();
+  }, [hashtagCount, phase, content, topic, audience, tone, hashtags]);
 
   // ── Handlers ───────────────────────────────────────────────
   const handleSelectAction = (action: typeof QUICK_ACTIONS[0]) => {
@@ -165,9 +249,11 @@ export function Editor({ post, userId, onPostUpdated, onStartNewPost, weeklyPost
     setIsGenerating(true);
 
     try {
-      const { result: generatedText, voiceTags: tags, postsAnalyzed: count } = await synthesizePost(rawInput, takeaway, finalAudience, finalTone);
+      const { result: generatedText, voiceTags: tags, postsAnalyzed: count, hashtags: generatedHashtags, bestPostingTime: generatedBestTime } = await synthesizePost(rawInput, takeaway, finalAudience, finalTone, hashtagCount);
       setVoiceTags(tags);
       setPostsAnalyzed(count);
+      setHashtags(generatedHashtags || []);
+      setBestPostingTime(generatedBestTime || null);
 
       const newHistoryItem: HistoryItem = {
         content: generatedText,
@@ -182,7 +268,7 @@ export function Editor({ post, userId, onPostUpdated, onStartNewPost, weeklyPost
       setFeedbackState("pending");
       setShowFeedbackOptions(false);
 
-      await savePost(rawInput, finalAudience, finalTone, generatedText, newHistory);
+      await savePost(rawInput, finalAudience, finalTone, generatedText, newHistory, generatedHashtags || [], generatedBestTime || null);
     } catch (error: any) {
       console.error("Synthesize error:", error);
       if (error.message === "UPGRADE_REQUIRED") {
@@ -202,7 +288,8 @@ export function Editor({ post, userId, onPostUpdated, onStartNewPost, weeklyPost
 
     setIsGenerating(true);
     try {
-      const result = await iteratePost(content, instruction);
+      const { result, hashtags: iteratedHashtags } = await iteratePost(content, instruction, topic, audience, hashtags, hashtagCount);
+      const safeHashtags = iteratedHashtags.length > 0 ? iteratedHashtags : hashtags;
       const newHistoryItem: HistoryItem = {
         content: result,
         label: instruction,
@@ -210,10 +297,11 @@ export function Editor({ post, userId, onPostUpdated, onStartNewPost, weeklyPost
       };
       const newHistory = [...history, newHistoryItem];
       setContent(result);
+      setHashtags(safeHashtags);
       setHistory(newHistory);
       setIterationInstruction("");
 
-      await savePost(topic, audience, tone, result, newHistory);
+      await savePost(topic, audience, tone, result, newHistory, safeHashtags, bestPostingTime);
     } catch (error: any) {
       console.error("Iterate error:", error);
       if (error.message === "UPGRADE_REQUIRED") {
@@ -234,7 +322,7 @@ export function Editor({ post, userId, onPostUpdated, onStartNewPost, weeklyPost
     const previousItem = newHistory[newHistory.length - 1];
     setContent(previousItem.content);
     setHistory(newHistory);
-    await savePost(topic, audience, tone, previousItem.content, newHistory);
+    await savePost(topic, audience, tone, previousItem.content, newHistory, hashtags, bestPostingTime);
   };
 
   const handleRevertTo = async (index: number) => {
@@ -243,7 +331,7 @@ export function Editor({ post, userId, onPostUpdated, onStartNewPost, weeklyPost
     setContent(selectedItem.content);
     setHistory(newHistory);
     setShowHistory(false);
-    await savePost(topic, audience, tone, selectedItem.content, newHistory);
+    await savePost(topic, audience, tone, selectedItem.content, newHistory, hashtags, bestPostingTime);
   };
 
   const handleDeleteHistoryItem = async (index: number) => {
@@ -254,22 +342,44 @@ export function Editor({ post, userId, onPostUpdated, onStartNewPost, weeklyPost
       setContent(lastItem.content);
     }
     setHistory(newHistory);
-    await savePost(topic, audience, tone, content, newHistory);
+    await savePost(topic, audience, tone, content, newHistory, hashtags, bestPostingTime);
   };
 
-  const savePost = async (t: string, a: string, tn: string, c: string, h: HistoryItem[]) => {
+  const savePost = async (
+    t: string,
+    a: string,
+    tn: string,
+    c: string,
+    h: HistoryItem[],
+    tags: string[],
+    bestTime: { label: string; reason: string } | null,
+  ) => {
     try {
       if (post?.id) {
         const postRef = doc(db, "posts", post.id);
         await updateDoc(postRef, {
           topic: t, audience: a, tone: tn, content: c, history: h,
+          hashtags: tags,
+          bestPostingTime: bestTime,
           updatedAt: serverTimestamp(),
         });
-        onPostUpdated({ ...post, topic: t, audience: a, tone: tn, content: c, history: h, updatedAt: new Date() } as Post);
+        onPostUpdated({
+          ...post,
+          topic: t,
+          audience: a,
+          tone: tn,
+          content: c,
+          history: h,
+          hashtags: tags,
+          bestPostingTime: bestTime,
+          updatedAt: new Date(),
+        } as Post);
       } else {
         const newPostRef = doc(collection(db, "posts"));
         const newPostData = {
           userId, topic: t, audience: a, tone: tn, content: c, history: h,
+          hashtags: tags,
+          bestPostingTime: bestTime,
           createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
         };
         await setDoc(newPostRef, newPostData);
@@ -281,9 +391,12 @@ export function Editor({ post, userId, onPostUpdated, onStartNewPost, weeklyPost
   };
 
   const copyToClipboard = () => {
-    // Strip markdown asterisks (**) for clean pasting to LinkedIn
-    const cleanContent = content.replace(/\*\*/g, '');
-    navigator.clipboard.writeText(cleanContent);
+    const linkedInReadyContent = convertMarkdownBoldToUnicode(content);
+    const fallbackHashtags = extractHashtagsFromText(linkedInReadyContent);
+    const finalHashtags = hashtags.length > 0 ? hashtags : fallbackHashtags;
+    const hashtagLine = finalHashtags.length > 0 ? `\n\n${finalHashtags.join(" ")}` : "";
+    const fullText = `${linkedInReadyContent}${hashtagLine}`.trim();
+    navigator.clipboard.writeText(fullText);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
 
@@ -316,6 +429,9 @@ export function Editor({ post, userId, onPostUpdated, onStartNewPost, weeklyPost
     setAudience("");
     setTone("");
     setHistory([]);
+    setHashtags([]);
+    setHashtagCount(5);
+    setBestPostingTime(null);
     setShowAdvanced(false);
     setShowHistory(false);
     setIsEditing(false);
@@ -329,6 +445,7 @@ export function Editor({ post, userId, onPostUpdated, onStartNewPost, weeklyPost
   const strokeDashoffset = circumference - (progressPercent / 100) * circumference;
 
   const postLines = content.split("\n");
+  const displayHashtags = hashtags.length > 0 ? hashtags : extractHashtagsFromText(content);
   const firstNonEmptyIndex = postLines.findIndex((line) => line.trim().length > 0);
   const hookLine = firstNonEmptyIndex >= 0 ? postLines[firstNonEmptyIndex].replace(/\*\*/g, "").trim() : "";
   const bodyMarkdown = firstNonEmptyIndex >= 0
@@ -582,6 +699,30 @@ export function Editor({ post, userId, onPostUpdated, onStartNewPost, weeklyPost
                 )}
               </div>
 
+              <div className="space-y-2">
+                <p className="text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground">HASHTAGS</p>
+                <div className="flex items-center gap-2">
+                  {HASHTAG_COUNT_OPTIONS.map((count) => {
+                    const isActive = hashtagCount === count;
+                    return (
+                      <button
+                        key={count}
+                        type="button"
+                        onClick={() => setHashtagCount(count)}
+                        className={`h-9 min-w-12 rounded-full border px-4 text-sm font-semibold transition-all ${
+                          isActive
+                            ? "bg-primary/10 border-primary/35 text-primary"
+                            : "bg-background border-border text-muted-foreground hover:text-foreground"
+                        }`}
+                        disabled={isGenerating}
+                      >
+                        {count}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
               {/* Generate button */}
               <Button
                 onClick={handleGenerate}
@@ -609,12 +750,22 @@ export function Editor({ post, userId, onPostUpdated, onStartNewPost, weeklyPost
                 >
                   ← Back to templates
                 </button>
-                <button
-                  onClick={handleStartNew}
-                  className="text-xs text-muted-foreground hover:text-primary transition-colors flex items-center gap-1"
-                >
-                  + Start a new post
-                </button>
+                <div className="flex items-center gap-3">
+                  {post?.id && (
+                    <button
+                      onClick={() => onDeletePost(post.id!)}
+                      className="text-xs text-destructive hover:text-destructive/80 transition-colors flex items-center gap-1 font-medium"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" /> Delete this post
+                    </button>
+                  )}
+                  <button
+                    onClick={handleStartNew}
+                    className="text-xs text-muted-foreground hover:text-primary transition-colors flex items-center gap-1"
+                  >
+                    + Start a new post
+                  </button>
+                </div>
               </div>
 
               {/* ── Post Card ─────────────────────────────── */}
@@ -659,6 +810,27 @@ export function Editor({ post, userId, onPostUpdated, onStartNewPost, weeklyPost
                       <div className="prose prose-sm max-w-none dark:prose-invert text-[15px] leading-relaxed">
                         <Markdown>{bodyMarkdown || content}</Markdown>
                       </div>
+                      {displayHashtags.length > 0 && (
+                        <div className="pt-4 border-t border-border/70 space-y-3">
+                          <div className="flex items-center gap-2">
+                            <Hash className="h-4 w-4 text-primary/60" />
+                            <p className="text-[11px] font-mono uppercase tracking-wider text-muted-foreground">Hashtags</p>
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            {displayHashtags.map((tag) => (
+                              <button
+                                key={tag}
+                                type="button"
+                                className="text-[12px] font-mono text-primary hover:underline underline-offset-2 px-2 py-1 rounded bg-primary/5 hover:bg-primary/10 transition-colors"
+                                onClick={() => navigator.clipboard.writeText(tag)}
+                                title="Click to copy hashtag"
+                              >
+                                {tag}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </>
                   )}
                 </div>
@@ -697,6 +869,41 @@ export function Editor({ post, userId, onPostUpdated, onStartNewPost, weeklyPost
                       {tag}
                     </span>
                   ))}
+                </div>
+              )}
+
+              {/* ── Best Post Time + Hashtags ─────────────── */}
+              {(bestPostingTime || displayHashtags.length > 0) && (
+                <div className="grid gap-3 md:grid-cols-2 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                  {bestPostingTime && (
+                    <div className="bg-linear-to-r from-sky-500/10 to-indigo-500/5 border border-sky-500/20 rounded-xl p-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Clock3 className="h-4 w-4 text-sky-600" />
+                        <p className="text-xs font-semibold uppercase tracking-wider text-sky-700 dark:text-sky-400">Best time to post</p>
+                      </div>
+                      <p className="text-sm font-bold">{bestPostingTime.label}</p>
+                      <p className="text-xs text-muted-foreground mt-1">{bestPostingTime.reason}</p>
+                    </div>
+                  )}
+
+                  {displayHashtags.length > 0 && (
+                    <div className="bg-linear-to-r from-violet-500/10 to-fuchsia-500/5 border border-violet-500/20 rounded-xl p-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Hash className="h-4 w-4 text-violet-600" />
+                        <p className="text-xs font-semibold uppercase tracking-wider text-violet-700 dark:text-violet-400">Suggested hashtags</p>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {displayHashtags.map((tag) => (
+                          <span
+                            key={tag}
+                            className="text-[11px] px-2 py-1 rounded-full bg-violet-500/10 text-violet-700 dark:text-violet-300 border border-violet-500/20"
+                          >
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -889,14 +1096,68 @@ export function Editor({ post, userId, onPostUpdated, onStartNewPost, weeklyPost
           )}
 
           {/* ── Loading overlay for generation ────────── */}
-          {isGenerating && phase === "result" && (
-            <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center">
-              <div className="flex flex-col items-center gap-3 animate-pulse">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                <p className="text-sm font-medium text-muted-foreground">Refining your post...</p>
-              </div>
-            </div>
-          )}
+          <AnimatePresence>
+            {isGenerating && phase === "result" && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.25 }}
+                className="fixed inset-0 z-50 bg-background/78 backdrop-blur-md flex items-center justify-center"
+              >
+                <motion.div
+                  initial={{ opacity: 0, y: 12, scale: 0.96 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 8, scale: 0.98 }}
+                  transition={{ duration: 0.35, ease: "easeOut" }}
+                  className="relative rounded-3xl border border-border/60 bg-card/95 px-8 py-7 shadow-[0_30px_90px_-45px_rgba(59,130,246,0.6)] min-w-[280px]"
+                >
+                  <motion.div
+                    className="absolute -inset-0.5 rounded-3xl pointer-events-none"
+                    style={{
+                      background: "linear-gradient(120deg, rgba(99,102,241,0.22), rgba(14,165,233,0.18), rgba(16,185,129,0.18))",
+                    }}
+                    animate={{ opacity: [0.35, 0.65, 0.35] }}
+                    transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
+                  />
+
+                  <div className="relative flex flex-col items-center gap-4">
+                    <div className="relative h-16 w-16">
+                      <motion.div
+                        className="absolute inset-0 rounded-full border-2 border-primary/35"
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                      />
+                      <motion.div
+                        className="absolute inset-2 rounded-full border-2 border-sky-500/35"
+                        animate={{ rotate: -360 }}
+                        transition={{ duration: 1.6, repeat: Infinity, ease: "linear" }}
+                      />
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <Loader2 className="h-6 w-6 text-primary animate-spin" />
+                      </div>
+                    </div>
+
+                    <div className="text-center">
+                      <p className="text-sm font-semibold tracking-tight">Refining your post</p>
+                      <p className="text-xs text-muted-foreground mt-1">Polishing hook, flow, and CTA for stronger reach</p>
+                    </div>
+
+                    <div className="flex items-center gap-1.5">
+                      {[0, 1, 2].map((i) => (
+                        <motion.span
+                          key={i}
+                          className="h-1.5 w-1.5 rounded-full bg-primary/70"
+                          animate={{ y: [0, -5, 0], opacity: [0.45, 1, 0.45] }}
+                          transition={{ duration: 0.8, repeat: Infinity, delay: i * 0.12 }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
         </div>
       </div>

@@ -1,6 +1,8 @@
 import express from "express";
 import { verifyFirebaseToken, AuthRequest } from "../middleware/auth";
 import { getAdminDb, getAdminAuth } from "../services/firebaseAdmin";
+import { Feedback } from "../models/Feedback.model";
+import { ErrorLog } from "../models/ErrorLog.model";
 
 const router = express.Router();
 
@@ -215,6 +217,34 @@ router.delete("/users/:userId", async (req: AuthRequest, res) => {
   } catch (error: unknown) {
     console.error("User deletion failed:", error);
     res.status(500).json({ error: "Failed to delete user" });
+  }
+});
+
+router.get("/feedback", async (_req: AuthRequest, res) => {
+  try {
+    const feedback = await Feedback.find({})
+      .sort({ submittedAt: -1 })
+      .select('-__v')
+      .limit(100);
+    
+    res.json({ feedback });
+  } catch (error: unknown) {
+    console.error("Feedback fetching failed:", error);
+    res.status(500).json({ error: "Failed to fetch feedback" });
+  }
+});
+
+router.get("/errors", async (_req: AuthRequest, res) => {
+  try {
+    const errors = await ErrorLog.find({})
+      .sort({ timestamp: -1 })
+      .select('-__v')
+      .limit(100);
+    
+    res.json({ errors });
+  } catch (error: unknown) {
+    console.error("Error logs fetching failed:", error);
+    res.status(500).json({ error: "Failed to fetch error logs" });
   }
 });
 
