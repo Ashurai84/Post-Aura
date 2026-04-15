@@ -11,6 +11,9 @@ frontend/dist/
 backend/dist/
 admin/dist/
 
+# Generated docs
+docs/
+
 # Environment variables — never commit secrets
 .env
 .env.local
