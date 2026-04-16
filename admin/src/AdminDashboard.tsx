@@ -81,6 +81,15 @@ interface ImageGeneration {
   timestamp: string | { seconds: number };
 }
 
+interface PaymentClick {
+  _id: string;
+  userId: string;
+  userName: string;
+  userEmail: string;
+  plan: string;
+  timestamp: string | { seconds: number };
+}
+
 interface SurveyOption {
   id: string;
   text: string;
@@ -101,10 +110,13 @@ export default function AdminDashboard() {
   const [userData, setUserData] = useState<UserData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'users' | 'feedback' | 'errors' | 'surveys' | 'images'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'feedback' | 'errors' | 'surveys' | 'images' | 'payment-clicks'>('users');
   const [feedback, setFeedback] = useState<FeedbackItem[]>([]);
   const [errorsData, setErrorsData] = useState<ErrorItem[]>([]);
-  const [surveys, setSurveys] = useState<Survey[]>([]);  const [images, setImages] = useState<ImageGeneration[]>([]);  const [modalPost, setModalPost] = useState<{ text: string; user: string; topic: string; time: string } | null>(null);
+  const [surveys, setSurveys] = useState<Survey[]>([]);  
+  const [images, setImages] = useState<ImageGeneration[]>([]);  
+  const [paymentClicks, setPaymentClicks] = useState<PaymentClick[]>([]);
+  const [modalPost, setModalPost] = useState<{ text: string; user: string; topic: string; time: string } | null>(null);
   const [modalCopied, setModalCopied] = useState(false);
   const navigate = useNavigate();
 
@@ -169,6 +181,14 @@ export default function AdminDashboard() {
             setImages(iData.images ?? []);
           }
         } catch (e) { console.error('[PostAura] Failed to fetch images', e); }
+
+        try {
+          const pcRes = await fetch(`${getApiBase()}/api/admin/payment-clicks`, { headers: { Authorization: `Bearer ${token}` } });
+          if (pcRes.ok) {
+            const pcData: { clicks: PaymentClick[] } = await pcRes.json();
+            setPaymentClicks(pcData.clicks ?? []);
+          }
+        } catch (e) { console.error('[PostAura] Failed to fetch payment clicks', e); }
 
       } catch (err: unknown) {
         setError(err instanceof Error ? err.message : 'Something went wrong.');
@@ -318,13 +338,13 @@ export default function AdminDashboard() {
         <div className="flex items-center justify-between flex-wrap gap-3">
           <h2 className="text-xl font-bold">Users &amp; Content</h2>
           <div className="flex gap-1 border rounded-xl p-1 bg-muted/30">
-            {(['users', 'feedback', 'errors', 'images', 'surveys'] as const).map(tab => (
+            {(['users', 'feedback', 'errors', 'images', 'payment-clicks', 'surveys'] as const).map(tab => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
                 className={`px-4 py-1.5 rounded-lg text-xs font-semibold uppercase tracking-wider transition-all ${activeTab === tab ? 'bg-card shadow text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
               >
-                {tab === 'users' ? 'Users' : tab === 'feedback' ? 'Feedback' : tab === 'errors' ? 'Error Logs' : tab === 'images' ? 'Images' : 'Surveys'}
+                {tab === 'users' ? 'Users' : tab === 'feedback' ? 'Feedback' : tab === 'errors' ? 'Error Logs' : tab === 'images' ? 'Images' : tab === 'payment-clicks' ? 'Payment Clicks' : 'Surveys'}
               </button>
             ))}
           </div>
@@ -516,6 +536,34 @@ export default function AdminDashboard() {
                   <p className="text-sm text-muted-foreground">
                     Generated: {new Date(typeof img.timestamp === 'object' && 'seconds' in img.timestamp ? img.timestamp.seconds * 1000 : img.timestamp).toLocaleString()}
                   </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {activeTab === 'payment-clicks' && (
+          <div className="space-y-3">
+            {paymentClicks.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16 gap-3 text-muted-foreground">
+                <MousePointer2 className="w-8 h-8" />
+                <p className="font-mono text-sm">No payment clicks yet.</p>
+              </div>
+            ) : paymentClicks.map((click, i) => (
+              <div key={click._id ?? i} className="flex flex-col sm:flex-row gap-4 justify-between items-start border rounded-2xl p-4 hover:bg-muted/20 transition-colors">
+                <div className="space-y-1.5 flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-mono text-sm font-semibold text-primary">{click.userName}</span>
+                    <span className="text-xs text-muted-foreground">{click.userEmail}</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${click.plan === 'pro' ? 'bg-primary/20 text-primary' : 'bg-emerald-500/20 text-emerald-600'}`}>
+                      {click.plan === 'pro' ? 'Pro Plan (Rs.99)' : click.plan === 'student' ? 'Student Plan (Rs.49)' : click.plan}
+                    </span>
+                    <p className="text-sm text-muted-foreground">
+                      Clicked: {new Date(typeof click.timestamp === 'object' && 'seconds' in click.timestamp ? click.timestamp.seconds * 1000 : click.timestamp).toLocaleString()}
+                    </p>
+                  </div>
                 </div>
               </div>
             ))}

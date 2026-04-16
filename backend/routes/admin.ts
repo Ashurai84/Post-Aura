@@ -249,6 +249,54 @@ router.get("/errors", async (_req: AuthRequest, res) => {
   }
 });
 
+// ── Payment Clicks Tracking ────────────────────────
+router.get("/payment-clicks", async (_req: AuthRequest, res) => {
+  try {
+    const db = getAdminDb();
+    const snapshot = await db
+      .collection("analytics")
+      .where("type", "==", "intent")
+      .orderBy("timestamp", "desc")
+      .limit(100)
+      .get();
+
+    const clicks: any[] = [];
+    for (const doc of snapshot.docs) {
+      const data = doc.data();
+      const userId = data.userId;
+      const plan = data.plan;
+      
+      // Get user info
+      let userName = "Unknown User";
+      let userEmail = "unknown@email.com";
+      try {
+        const userDoc = await db.collection("users").doc(userId).get();
+        if (userDoc.exists) {
+          const userData = userDoc.data();
+          userName = userData?.name || "Unnamed";
+          userEmail = userData?.email || "unknown@email.com";
+        }
+      } catch (e) {
+        console.warn("Could not fetch user info:", e);
+      }
+
+      clicks.push({
+        _id: doc.id,
+        userId,
+        userName,
+        userEmail,
+        plan: plan || "unknown",
+        timestamp: data.timestamp?.toDate?.() || new Date(),
+      });
+    }
+
+    res.json({ clicks });
+  } catch (error: unknown) {
+    console.error("Payment clicks fetch failed:", error);
+    res.status(500).json({ error: "Failed to fetch payment clicks" });
+  }
+});
+
 // ── Image Generation Tracking ──────────────────────
 router.get("/images", async (_req: AuthRequest, res) => {
   try {
