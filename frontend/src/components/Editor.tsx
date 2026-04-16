@@ -810,27 +810,6 @@ export function Editor({ post, userId, onPostUpdated, onStartNewPost, onDeletePo
                       <div className="prose prose-sm max-w-none dark:prose-invert text-[15px] leading-relaxed">
                         <Markdown>{bodyMarkdown || content}</Markdown>
                       </div>
-                      {displayHashtags.length > 0 && (
-                        <div className="pt-4 border-t border-border/70 space-y-3">
-                          <div className="flex items-center gap-2">
-                            <Hash className="h-4 w-4 text-primary/60" />
-                            <p className="text-[11px] font-mono uppercase tracking-wider text-muted-foreground">Hashtags</p>
-                          </div>
-                          <div className="flex flex-wrap gap-2">
-                            {displayHashtags.map((tag) => (
-                              <button
-                                key={tag}
-                                type="button"
-                                className="text-[12px] font-mono text-primary hover:underline underline-offset-2 px-2 py-1 rounded bg-primary/5 hover:bg-primary/10 transition-colors"
-                                onClick={() => navigator.clipboard.writeText(tag)}
-                                title="Click to copy hashtag"
-                              >
-                                {tag}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      )}
                     </>
                   )}
                 </div>
@@ -944,12 +923,13 @@ export function Editor({ post, userId, onPostUpdated, onStartNewPost, onDeletePo
                       size="sm"
                       className="flex-1 h-11 rounded-xl border-2 border-amber-300 hover:bg-amber-50 hover:border-amber-400 dark:hover:bg-amber-500/10 transition-all font-semibold"
                       onClick={() => {
-                        setFeedbackState("rejected");
-                        setShowFeedbackOptions(true);
+                        setFeedbackState("pending");
+                        handleGenerate();
                       }}
+                      disabled={isGenerating}
                     >
                       <ThumbsDown className="h-4 w-4 mr-2 text-amber-600" />
-                      Not quite
+                      Not quite — Try again
                     </Button>
                   </div>
                   <p className="text-[10px] text-muted-foreground mt-2 text-center">
