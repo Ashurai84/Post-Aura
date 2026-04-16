@@ -6,6 +6,7 @@ import { verifyFirebaseToken, AuthRequest } from "./middleware/auth";
 import { checkUsage } from "./middleware/checkUsage";
 import { getAdminDb, FieldValue } from "./services/firebaseAdmin";
 import { Survey, SurveyResponse } from "./models/Survey.model";
+import { Feedback } from "./models/Feedback.model";
 
 const router = express.Router();
 
@@ -369,7 +370,74 @@ router.post("/ai/generate-image", verifyFirebaseToken, checkUsage, async (req: A
   }
 });
 
+// Voice feedback endpoint — learns from user corrections
+router.post("/ai/voice-feedback", verifyFirebaseToken, async (req: AuthRequest, res) => {
+  try {
+    const { type, reason, content } = req.body;
+    const userRef = getAdminDb().collection("users").doc(req.user!.uid);
+    
+    if (type === "approved" && content) {
+      // User confirmed this sounds like them — reinforce the profile from this content
+      await updateVoiceProfile(req.user!.uid, content);
+    }
 
+    if (type === "rejected" && reason) {
+      // Direct signal — stronger than automatic analysis
+      const userDoc = await userRef.get();
+      const existing = userDoc.exists ? userDoc.data()?.voiceProfile || {} : {};
+      const corrections = existing.corrections || {};
+      corrections[reason] = (corrections[reason] || 0) + 1;
+
+      // Apply direct corrections to profile
+      const updates: Record<string, any> = { "voiceProfile.corrections": corrections };
+      if (reason === "too formal") {
+        updates["voiceProfile.prefersCasual"] = true;
+      } else if (reason === "too long") {
+        updates["voiceProfile.avgSentenceLength"] = "short";
+      } else if (reason === "too generic") {
+        updates["voiceProfile.prefersSpecific"] = true;
+      } else if (reason === "not my opinion") {
+        updates["voiceProfile.prefersStrongStance"] = true;
+      }
+      
+      await userRef.update(updates);
+    }
+
+    res.json({ ok: true });
+  } catch (error) {
+    console.warn("Voice feedback error:", error);
+    res.json({ ok: true }); // Don't fail the user experience
+  }
+});
+
+// General feedback submission endpoint
+router.post("/voice-feedback", verifyFirebaseToken, async (req: AuthRequest, res) => {
+  try {
+    const { type, message, rating, page } = req.body;
+    
+    const feedback = await Feedback.create({
+      userId: req.user!.uid,
+      type: type || "suggestion",
+      message,
+      rating: rating || 5,
+      page: page || "unknown",
+      submittedAt: new Date(),
+    });
+
+    console.log("[PostAura] Feedback submitted:", {
+      userId: req.user!.uid,
+      type,
+      rating,
+      page,
+      message: message.substring(0, 50) + "...",
+    });
+
+    res.json({ ok: true, feedbackId: feedback._id });
+  } catch (error) {
+    console.error("Feedback submission failed:", error);
+    res.status(500).json({ error: "Failed to submit feedback" });
+  }
+});
 
 // Analytics tracking endpoint
 router.post("/analytics/track-intent", verifyFirebaseToken, async (req: AuthRequest, res) => {

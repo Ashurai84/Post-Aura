@@ -1,6 +1,7 @@
 import express from "express";
 import { verifyFirebaseToken, AuthRequest, requireAdminEmail } from "../middleware/auth";
 import { getAdminDb, getAdminAuth } from "../services/firebaseAdmin";
+import { Feedback } from "../models/Feedback.model";
 import { ErrorLog } from "../models/ErrorLog.model";
 import { Survey, SurveyResponse } from "../models/Survey.model";
 
@@ -207,6 +208,58 @@ router.delete("/users/:userId", async (req: AuthRequest, res) => {
   }
 });
 
+router.get("/feedback", async (_req: AuthRequest, res) => {
+  try {
+    const db = getAdminDb();
+    
+    // Fetch general feedback from MongoDB
+    const mongoFeedback = await Feedback.find({})
+      .sort({ submittedAt: -1 })
+      .select('-__v')
+      .limit(100);
+
+    // Fetch post quality feedback from Firestore analytics
+    const firestoreFeedback: any[] = [];
+    const analyticsSnap = await db
+      .collection("analytics")
+      .where("type", "==", "post-feedback")
+      .orderBy("timestamp", "desc")
+      .limit(100)
+      .get();
+    
+    for (const doc of analyticsSnap.docs) {
+      const data = doc.data();
+      firestoreFeedback.push({
+        _id: doc.id,
+        userId: data.userId || "",
+        type: "post-feedback",
+        message: `Post quality: ${data.rating}`,
+        rating: 5, // Post feedback is just liked/disliked
+        page: "editor",
+        postContent: data.postContent?.substring(0, 100) + "..." || "",
+        topic: data.topic || "",
+        audience: data.audience || "",
+        tone: data.tone || "",
+        submittedAt: data.timestamp?.toDate?.() || new Date(),
+      });
+    }
+
+    // Combine both sources
+    const allFeedback = [...firestoreFeedback, ...mongoFeedback]
+      .sort((a: any, b: any) => {
+        const timeA = new Date(a.submittedAt).getTime();
+        const timeB = new Date(b.submittedAt).getTime();
+        return timeB - timeA;
+      })
+      .slice(0, 100);
+
+    res.json({ feedback: allFeedback });
+  } catch (error: unknown) {
+    console.error("Feedback fetching failed:", error);
+    res.status(500).json({ error: "Failed to fetch feedback" });
+  }
+});
+
 router.get("/errors", async (_req: AuthRequest, res) => {
   try {
     const errors = await ErrorLog.find({})
@@ -399,6 +452,79 @@ router.get("/surveys/:surveyId/results", async (req: AuthRequest, res) => {
   } catch (error: unknown) {
     console.error("Survey results fetching failed:", error);
     res.status(500).json({ error: "Failed to fetch survey results" });
+  }
+});
+
+// ── Post Quality Feedback ──────────────────────────
+router.get("/post-feedback", async (_req: AuthRequest, res) => {
+  try {
+    const db = getAdminDb();
+    const snapshot = await db
+      .collection("analytics")
+      .where("type", "==", "post-feedback")
+      .get();
+
+    const feedback: any[] = [];
+    for (const doc of snapshot.docs) {
+      const data = doc.data();
+      feedback.push({
+        _id: doc.id,
+        userId: data.userId,
+        userName: data.userName,
+        userEmail: data.userEmail,
+        postContent: data.postContent,
+        topic: data.topic,
+        audience: data.audience,
+        tone: data.tone,
+        rating: data.rating,
+        timestamp: data.timestamp?.toDate?.() || new Date(),
+      });
+    }
+
+    // Sort by timestamp descending, then limit to 100
+    const sortedFeedback = feedback
+      .sort((a: any, b: any) => {
+        const timeA = a.timestamp?.getTime?.() || 0;
+        const timeB = b.timestamp?.getTime?.() || 0;
+        return timeB - timeA;
+      })
+      .slice(0, 100);
+
+    res.json({ feedback: sortedFeedback });
+  } catch (error: unknown) {
+    console.error("Post feedback fetch failed:", error);
+    res.status(500).json({ error: "Failed to fetch post feedback" });
+  }
+});
+
+router.post("/post-feedback", async (req: AuthRequest, res) => {
+  try {
+    const { userId, userName, userEmail, postContent, topic, audience, tone, rating } = req.body;
+    
+    if (!userId || !rating || !postContent) {
+      return res.status(400).json({ error: "Missing required fields" });
+    }
+
+    const db = getAdminDb();
+    
+    // Save to Firestore analytics collection
+    await db.collection("analytics").add({
+      type: "post-feedback",
+      userId,
+      userName,
+      userEmail,
+      postContent: postContent.substring(0, 500), // Limit content length
+      topic,
+      audience,
+      tone,
+      rating, // "liked" or "disliked"
+      timestamp: new Date(),
+    });
+
+    res.json({ success: true, message: "Feedback recorded" });
+  } catch (error: unknown) {
+    console.error("Post feedback save failed:", error);
+    res.status(500).json({ error: "Failed to save feedback" });
   }
 });
 
