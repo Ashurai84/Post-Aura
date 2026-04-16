@@ -253,11 +253,10 @@ router.get("/errors", async (_req: AuthRequest, res) => {
 router.get("/payment-clicks", async (_req: AuthRequest, res) => {
   try {
     const db = getAdminDb();
+    // Removed orderBy to avoid composite index requirement - will sort in code
     const snapshot = await db
       .collection("analytics")
       .where("type", "==", "intent")
-      .orderBy("timestamp", "desc")
-      .limit(100)
       .get();
 
     const clicks: any[] = [];
@@ -290,6 +289,13 @@ router.get("/payment-clicks", async (_req: AuthRequest, res) => {
       });
     }
 
+    // Sort by timestamp descending, then limit to 100
+    clicks.sort((a: any, b: any) => {
+      const timeA = a.timestamp?.getTime?.() || 0;
+      const timeB = b.timestamp?.getTime?.() || 0;
+      return timeB - timeA;
+    }).slice(0, 100);
+
     res.json({ clicks });
   } catch (error: unknown) {
     console.error("Payment clicks fetch failed:", error);
@@ -301,11 +307,10 @@ router.get("/payment-clicks", async (_req: AuthRequest, res) => {
 router.get("/images", async (_req: AuthRequest, res) => {
   try {
     const db = getAdminDb();
+    // Removed orderBy to avoid composite index requirement - will sort in code
     const snapshot = await db
       .collection("analytics")
       .where("type", "==", "image-generated")
-      .orderBy("timestamp", "desc")
-      .limit(100)
       .get();
 
     const images: any[] = [];
@@ -336,6 +341,13 @@ router.get("/images", async (_req: AuthRequest, res) => {
         type: "image-generated",
       });
     }
+
+    // Sort by timestamp descending, then limit to 100
+    images.sort((a: any, b: any) => {
+      const timeA = a.timestamp?.getTime?.() || 0;
+      const timeB = b.timestamp?.getTime?.() || 0;
+      return timeB - timeA;
+    }).slice(0, 100);
 
     res.json({ images });
   } catch (error: unknown) {
