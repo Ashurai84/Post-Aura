@@ -61,6 +61,19 @@ interface FeedbackItem {
   page?: string;
 }
 
+interface PostFeedback {
+  _id: string;
+  userId: string;
+  userName: string;
+  userEmail: string;
+  postContent: string;
+  topic: string;
+  audience: string;
+  tone: string;
+  rating: "liked" | "disliked";
+  timestamp: string | { seconds: number };
+}
+
 interface ErrorItem {
   _id?: string;
   message: string;
@@ -112,6 +125,7 @@ export default function AdminDashboard() {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'users' | 'feedback' | 'errors' | 'surveys' | 'images' | 'payment-clicks'>('users');
   const [feedback, setFeedback] = useState<FeedbackItem[]>([]);
+  const [postFeedback, setPostFeedback] = useState<PostFeedback[]>([]);
   const [errorsData, setErrorsData] = useState<ErrorItem[]>([]);
   const [surveys, setSurveys] = useState<Survey[]>([]);  
   const [images, setImages] = useState<ImageGeneration[]>([]);  
@@ -157,6 +171,14 @@ export default function AdminDashboard() {
             setFeedback(Array.isArray(fData) ? fData : (fData.feedback ?? []));
           }
         } catch (e) { console.error('[PostAura] Failed to fetch feedback', e); }
+
+        try {
+          const pfRes = await fetch(`${getApiBase()}/api/admin/post-feedback`, { headers: { Authorization: `Bearer ${token}` } });
+          if (pfRes.ok) {
+            const pfData: { feedback?: PostFeedback[] } = await pfRes.json();
+            setPostFeedback(pfData.feedback ?? []);
+          }
+        } catch (e) { console.error('[PostAura] Failed to fetch post feedback', e); }
 
         try {
           const eRes = await fetch(`${getApiBase()}/api/admin/errors`, { headers: { Authorization: `Bearer ${token}` } });
@@ -424,29 +446,71 @@ export default function AdminDashboard() {
 
         {activeTab === 'feedback' && (
           <div className="space-y-3">
-            {feedback.length === 0 ? (
+            {feedback.length === 0 && postFeedback.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 gap-3 text-muted-foreground">
                 <MessageSquare className="w-8 h-8" />
                 <p className="font-mono text-sm">No feedback submitted yet.</p>
               </div>
-            ) : feedback.map((f, i) => (
-              <div key={f._id ?? i} className="flex flex-col sm:flex-row gap-4 justify-between items-start border rounded-2xl p-4 hover:bg-muted/20 transition-colors">
-                <div className="space-y-1.5 flex-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span>{Array.from({ length: 5 }).map((_, j) => j < f.rating ? 'S' : 'o').join('')}</span>
-                    <span className={`px-2 py-0.5 text-[10px] font-bold uppercase rounded-full border ${f.type === 'love' ? 'border-pink-300 text-pink-600 bg-pink-50' : f.type === 'bug' ? 'border-red-300 text-red-600 bg-red-50' : f.type === 'feature' ? 'border-indigo-300 text-indigo-600 bg-indigo-50' : f.type === 'suggestion' ? 'border-sky-300 text-sky-600 bg-sky-50' : 'border-muted-foreground/30 text-muted-foreground'}`}>
-                      {f.type}
-                    </span>
-                    <span className="text-xs text-muted-foreground">{f.submittedAt ? new Date(f.submittedAt).toLocaleString() : ''}</span>
+            ) : (
+              <>
+                {/* Post Quality Feedback */}
+                {postFeedback.length > 0 && (
+                  <div className="space-y-2">
+                    <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Post Quality Feedback ({postFeedback.length})</h4>
+                    {postFeedback.map((pf, i) => (
+                      <div key={pf._id ?? i} className="flex flex-col sm:flex-row gap-4 justify-between items-start border rounded-2xl p-4 hover:bg-muted/20 transition-colors">
+                        <div className="space-y-1.5 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-mono text-sm font-semibold text-primary">{pf.userName}</span>
+                            <span className="text-xs text-muted-foreground">{pf.userEmail}</span>
+                            <span className={`px-3 py-1 text-xs font-semibold rounded-full ${pf.rating === 'liked' ? 'bg-emerald-500/20 text-emerald-600' : 'bg-amber-500/20 text-amber-600'}`}>
+                              {pf.rating === 'liked' ? '👍 Liked' : '👎 Disliked'}
+                            </span>
+                          </div>
+                          <p className="text-sm text-muted-foreground leading-relaxed">"{pf.postContent.substring(0, 100)}..."</p>
+                          <div className="flex gap-2 text-xs text-muted-foreground">
+                            <span>Topic: <span className="font-mono">{pf.topic}</span></span>
+                            <span>•</span>
+                            <span>Tone: <span className="font-mono">{pf.tone}</span></span>
+                          </div>
+                          <p className="text-[11px] text-muted-foreground">
+                            {new Date(typeof pf.timestamp === 'object' && 'seconds' in pf.timestamp ? pf.timestamp.seconds * 1000 : pf.timestamp).toLocaleString()}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                  <p className="text-sm leading-relaxed">{f.message}</p>
-                  {(f.name ?? f.email) && (
-                    <p className="text-xs text-muted-foreground font-mono">{f.name}{f.email ? ` - ${f.email}` : ''}</p>
-                  )}
-                </div>
-                <span className="text-xs text-muted-foreground px-2 py-1 bg-muted/40 rounded-lg font-mono shrink-0">{f.page ?? 'unknown'}</span>
-              </div>
-            ))}
+                )}
+
+                {/* Separator */}
+                {feedback.length > 0 && postFeedback.length > 0 && <div className="border-t my-4"></div>}
+
+                {/* Bug Reports & Suggestions */}
+                {feedback.length > 0 && (
+                  <div className="space-y-2">
+                    <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Bug Reports & Suggestions ({feedback.length})</h4>
+                    {feedback.map((f, i) => (
+                      <div key={f._id ?? i} className="flex flex-col sm:flex-row gap-4 justify-between items-start border rounded-2xl p-4 hover:bg-muted/20 transition-colors">
+                        <div className="space-y-1.5 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span>{Array.from({ length: 5 }).map((_, j) => j < f.rating ? 'S' : 'o').join('')}</span>
+                            <span className={`px-2 py-0.5 text-[10px] font-bold uppercase rounded-full border ${f.type === 'love' ? 'border-pink-300 text-pink-600 bg-pink-50' : f.type === 'bug' ? 'border-red-300 text-red-600 bg-red-50' : f.type === 'feature' ? 'border-indigo-300 text-indigo-600 bg-indigo-50' : f.type === 'suggestion' ? 'border-sky-300 text-sky-600 bg-sky-50' : 'border-muted-foreground/30 text-muted-foreground'}`}>
+                              {f.type}
+                            </span>
+                            <span className="text-xs text-muted-foreground">{f.submittedAt ? new Date(f.submittedAt).toLocaleString() : ''}</span>
+                          </div>
+                          <p className="text-sm leading-relaxed">{f.message}</p>
+                          {(f.name ?? f.email) && (
+                            <p className="text-xs text-muted-foreground font-mono">{f.name}{f.email ? ` - ${f.email}` : ''}</p>
+                          )}
+                        </div>
+                        <span className="text-xs text-muted-foreground px-2 py-1 bg-muted/40 rounded-lg font-mono shrink-0">{f.page ?? 'unknown'}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
           </div>
         )}
 
