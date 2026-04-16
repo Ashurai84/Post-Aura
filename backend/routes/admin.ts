@@ -290,13 +290,15 @@ router.get("/payment-clicks", async (_req: AuthRequest, res) => {
     }
 
     // Sort by timestamp descending, then limit to 100
-    clicks.sort((a: any, b: any) => {
-      const timeA = a.timestamp?.getTime?.() || 0;
-      const timeB = b.timestamp?.getTime?.() || 0;
-      return timeB - timeA;
-    }).slice(0, 100);
+    const sortedClicks = clicks
+      .sort((a: any, b: any) => {
+        const timeA = a.timestamp?.getTime?.() || 0;
+        const timeB = b.timestamp?.getTime?.() || 0;
+        return timeB - timeA;
+      })
+      .slice(0, 100);
 
-    res.json({ clicks });
+    res.json({ clicks: sortedClicks });
   } catch (error: unknown) {
     console.error("Payment clicks fetch failed:", error);
     res.status(500).json({ error: "Failed to fetch payment clicks" });
@@ -343,13 +345,15 @@ router.get("/images", async (_req: AuthRequest, res) => {
     }
 
     // Sort by timestamp descending, then limit to 100
-    images.sort((a: any, b: any) => {
-      const timeA = a.timestamp?.getTime?.() || 0;
-      const timeB = b.timestamp?.getTime?.() || 0;
-      return timeB - timeA;
-    }).slice(0, 100);
+    const sortedImages = images
+      .sort((a: any, b: any) => {
+        const timeA = a.timestamp?.getTime?.() || 0;
+        const timeB = b.timestamp?.getTime?.() || 0;
+        return timeB - timeA;
+      })
+      .slice(0, 100);
 
-    res.json({ images });
+    res.json({ images: sortedImages });
   } catch (error: unknown) {
     console.error("Image generation fetch failed:", error);
     res.status(500).json({ error: "Failed to fetch image generations" });
