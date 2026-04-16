@@ -210,12 +210,50 @@ router.delete("/users/:userId", async (req: AuthRequest, res) => {
 
 router.get("/feedback", async (_req: AuthRequest, res) => {
   try {
-    const feedback = await Feedback.find({})
+    const db = getAdminDb();
+    
+    // Fetch general feedback from MongoDB
+    const mongoFeedback = await Feedback.find({})
       .sort({ submittedAt: -1 })
       .select('-__v')
       .limit(100);
+
+    // Fetch post quality feedback from Firestore analytics
+    const firestoreFeedback: any[] = [];
+    const analyticsSnap = await db
+      .collection("analytics")
+      .where("type", "==", "post-feedback")
+      .orderBy("timestamp", "desc")
+      .limit(100)
+      .get();
     
-    res.json({ feedback });
+    for (const doc of analyticsSnap.docs) {
+      const data = doc.data();
+      firestoreFeedback.push({
+        _id: doc.id,
+        userId: data.userId || "",
+        type: "post-feedback",
+        message: `Post quality: ${data.rating}`,
+        rating: 5, // Post feedback is just liked/disliked
+        page: "editor",
+        postContent: data.postContent?.substring(0, 100) + "..." || "",
+        topic: data.topic || "",
+        audience: data.audience || "",
+        tone: data.tone || "",
+        submittedAt: data.timestamp?.toDate?.() || new Date(),
+      });
+    }
+
+    // Combine both sources
+    const allFeedback = [...firestoreFeedback, ...mongoFeedback]
+      .sort((a: any, b: any) => {
+        const timeA = new Date(a.submittedAt).getTime();
+        const timeB = new Date(b.submittedAt).getTime();
+        return timeB - timeA;
+      })
+      .slice(0, 100);
+
+    res.json({ feedback: allFeedback });
   } catch (error: unknown) {
     console.error("Feedback fetching failed:", error);
     res.status(500).json({ error: "Failed to fetch feedback" });
