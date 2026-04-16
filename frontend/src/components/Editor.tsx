@@ -284,6 +284,42 @@ export function Editor({ post, userId, onPostUpdated, onStartNewPost, onDeletePo
     }
   };
 
+  const handleRegeneratePost = async () => {
+    if (!content || !topic || !audience || !tone) return;
+
+    setIsGenerating(true);
+    try {
+      // Generate a completely different version using same parameters
+      const { result: generatedText, hashtags: generatedHashtags } = await iteratePost(
+        content,
+        "Create a completely different version of this post that still conveys the same message.",
+        topic,
+        audience,
+        hashtags,
+        hashtagCount
+      );
+
+      const newHistoryItem: HistoryItem = {
+        content: generatedText,
+        label: "Regenerated",
+        timestamp: new Date(),
+      };
+
+      const newHistory = [...history, newHistoryItem];
+      setContent(generatedText);
+      setHistory(newHistory);
+      setHashtags(generatedHashtags || hashtags);
+      setFeedbackState("pending");
+
+      await savePost(rawInput || topic, audience, tone, generatedText, newHistory, generatedHashtags || hashtags, bestPostingTime || null);
+    } catch (error: any) {
+      console.error("Regeneration error:", error);
+      alert("Failed to regenerate. Please try again.");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   const handleIterate = async (instruction: string) => {
     if (!content || !instruction.trim()) return;
 
@@ -959,8 +995,7 @@ export function Editor({ post, userId, onPostUpdated, onStartNewPost, onDeletePo
                       size="sm"
                       className="flex-1 h-11 rounded-xl border-2 border-amber-300 hover:bg-amber-50 hover:border-amber-400 dark:hover:bg-amber-500/10 transition-all font-semibold"
                       onClick={() => {
-                        setFeedbackState("pending");
-                        handleGenerate();
+                        handleRegeneratePost();
                       }}
                       disabled={isGenerating}
                     >
