@@ -6,6 +6,20 @@ if (!import.meta.env.DEV) {
   setLogLevel("silent");
 }
 
+// ✅ SECURITY: Clean up sensitive URL parameters if present
+if (typeof window !== "undefined") {
+  // Remove Firebase redirects with API keys from browser history
+  const params = new URLSearchParams(window.location.search);
+  if (
+    params.has("apiKey") ||
+    params.has("authType") ||
+    params.has("redirectUrl") ||
+    window.location.hash.includes("access_token")
+  ) {
+    window.history.replaceState({}, document.title, window.location.origin + window.location.pathname);
+  }
+}
+
 const required = [
   "VITE_FIREBASE_API_KEY",
   "VITE_FIREBASE_AUTH_DOMAIN",

@@ -72,7 +72,18 @@ export const signInWithGoogle = async () => {
 
 export const handleRedirectResult = async () => {
   try {
+    // ✅ SECURITY: Clean up URL after redirect to remove exposed API key from browser history
+    if (typeof window !== "undefined" && window.location.hash.includes("access_token")) {
+      window.history.replaceState({}, document.title, window.location.origin + window.location.pathname);
+    }
+
     const result = await getRedirectResult(auth);
+    
+    // ✅ SECURITY: Clear sensitive query parameters after successful auth
+    if (result && typeof window !== "undefined") {
+      window.history.replaceState({}, document.title, window.location.origin + window.location.pathname);
+    }
+
     if (!result) return null;
     const user = result.user;
 
@@ -96,6 +107,11 @@ export const handleRedirectResult = async () => {
 
     return user;
   } catch (error) {
+    // ✅ SECURITY: Clean URL on error too
+    if (typeof window !== "undefined") {
+      window.history.replaceState({}, document.title, window.location.origin + window.location.pathname);
+    }
+    
     if (import.meta.env.DEV) {
       console.error("Error handling redirect result", error);
     } else {
