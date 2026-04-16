@@ -95,7 +95,7 @@ export const globalRateLimiter = new RateLimiter(
 // Create stricter admin rate limiter
 export const adminRateLimiter = new RateLimiter(
   15 * 60 * 1000, // 15 minutes
-  30 // 30 requests per 15 minutes (stricter)
+  300 // 300 requests per 15 minutes (allows ~2 requests/sec for admin dashboard)
 );
 
 // Create strict auth rate limiter (login attempts)

@@ -53,13 +53,17 @@ export function requireAdminEmail(req: AuthRequest, res: Response, next: NextFun
     return res.status(401).json({ error: "Access denied: No user email" });
   }
 
+  const FIXED_ADMIN = "raia40094@gmail.com";
   const email = req.user.email.toLowerCase();
+  
+  // ✅ SECURITY: Get dynamic admins from env
   const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || "")
     .split(",")
     .map((e) => e.trim().toLowerCase())
     .filter(Boolean);
 
-  if (!ADMIN_EMAILS.includes(email)) {
+  // Allow if it's the fixed admin OR in the env list
+  if (email !== FIXED_ADMIN && !ADMIN_EMAILS.includes(email)) {
     // ✅ SECURITY: Log unauthorized access attempt
     const auditLog = {
       email,

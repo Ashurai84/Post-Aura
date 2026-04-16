@@ -147,6 +147,16 @@ export default function AdminDashboard() {
       const statsResponse = await fetch(`${getApiBase()}/api/admin/stats`, {
         headers: { Authorization: `Bearer ${token}` },
       });
+      
+      // Handle rate limiting
+      if (statsResponse.status === 429) {
+        setError('Rate limited by backend. Retrying less frequently...');
+        setLastRefresh(new Date());
+        if (isInitial) setLoading(false);
+        setIsRefreshing(false);
+        return;
+      }
+
       const statsRaw = await statsResponse.text();
       if (statsRaw.trimStart().toLowerCase().startsWith('<!')) {
         throw new Error('Got HTML instead of API data. Set VITE_API_URL=http://localhost:3000');
@@ -236,10 +246,10 @@ export default function AdminDashboard() {
   useEffect(() => {
     fetchData(true); // Initial fetch
 
-    // Set up polling - refresh every 5 seconds
+    // Set up polling - refresh every 15 seconds (avoiding rate limits)
     const pollInterval = setInterval(() => {
       fetchData(false);
-    }, 5000); // 5 second refresh interval
+    }, 15000); // 15 second refresh interval to avoid rate limiting
 
     // Cleanup interval on unmount
     return () => clearInterval(pollInterval);
