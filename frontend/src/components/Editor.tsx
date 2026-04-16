@@ -148,6 +148,8 @@ export function Editor({ post, userId, onPostUpdated, onStartNewPost, onDeletePo
   const [showFeedbackOptions, setShowFeedbackOptions] = useState(false);
   const [voiceTags, setVoiceTags] = useState<string[]>([]);
   const [postsAnalyzed, setPostsAnalyzed] = useState(0);
+  const [showPostQualityFeedback, setShowPostQualityFeedback] = useState(false);
+  const [postQualityRating, setPostQualityRating] = useState<"liked" | "disliked" | null>(null);
   const [hashtags, setHashtags] = useState<string[]>([]);
   const [hashtagCount, setHashtagCount] = useState<3 | 5 | 10>(5);
   const [bestPostingTime, setBestPostingTime] = useState<{ label: string; reason: string } | null>(null);
@@ -267,6 +269,11 @@ export function Editor({ post, userId, onPostUpdated, onStartNewPost, onDeletePo
       setPhase("result");
       setFeedbackState("pending");
       setShowFeedbackOptions(false);
+
+      // After a brief delay, show post quality feedback
+      setTimeout(() => {
+        setShowPostQualityFeedback(true);
+      }, 1500);
 
       await savePost(rawInput, finalAudience, finalTone, generatedText, newHistory, generatedHashtags || [], generatedBestTime || null);
     } catch (error: any) {
@@ -501,6 +508,35 @@ export function Editor({ post, userId, onPostUpdated, onStartNewPost, onDeletePo
       });
     } catch (e) {
       console.warn("Voice feedback failed:", e);
+    }
+  };
+
+  const submitPostQualityFeedback = async (rating: "liked" | "disliked") => {
+    try {
+      const user = auth.currentUser;
+      if (!user) return;
+      const token = await user.getIdToken();
+      
+      await fetch(`${getApiBase()}/api/admin/post-feedback`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          userId: user.uid,
+          userName: user.displayName || user.email || "Unknown",
+          userEmail: user.email,
+          postContent: content,
+          topic: topic,
+          audience: audience,
+          tone: tone,
+          rating: rating,
+          timestamp: new Date().toISOString(),
+        }),
+      });
+      
+      setPostQualityRating(rating);
+      setTimeout(() => setShowPostQualityFeedback(false), 1000);
+    } catch (e) {
+      console.warn("Post quality feedback failed:", e);
     }
   };
 
@@ -906,7 +942,7 @@ export function Editor({ post, userId, onPostUpdated, onStartNewPost, onDeletePo
                       <div className="flex items-center justify-between gap-2 mb-3">
                         <div className="flex items-center gap-2">
                           <Hash className="h-4 w-4 text-violet-600" />
-                          <p className="text-xs font-semibold uppercase tracking-wider text-violet-700 dark:text-violet-400">Suggested hashtags</p>
+                          <p className="text-xs font-semibold uppercase tracking-wider text-violet-700 dark:text-violet-400">More hashtags to try</p>
                         </div>
                         <Button
                           variant="ghost"
@@ -993,7 +1029,8 @@ export function Editor({ post, userId, onPostUpdated, onStartNewPost, onDeletePo
                       size="sm"
                       className="flex-1 h-11 rounded-xl border-2 border-amber-300 hover:bg-amber-50 hover:border-amber-400 dark:hover:bg-amber-500/10 transition-all font-semibold"
                       onClick={() => {
-                        handleRegeneratePost();
+                        setFeedbackState("rejected");
+                        setShowFeedbackOptions(true);
                       }}
                       disabled={isGenerating}
                     >
@@ -1051,6 +1088,40 @@ export function Editor({ post, userId, onPostUpdated, onStartNewPost, onDeletePo
                       </Button>
                     ))}
                   </div>
+                </div>
+              )}
+
+              {/* Post Quality Feedback Dialog */}
+              {showPostQualityFeedback && postQualityRating === null && (
+                <div className="border-2 border-blue-500/25 bg-gradient-to-br from-blue-500/8 to-transparent rounded-xl p-4 space-y-3 animate-in fade-in slide-in-from-top-2 duration-200">
+                  <p className="text-sm font-semibold">Quick question: Did you like this post? 👍</p>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      className="flex-1 h-10 text-xs rounded-lg font-medium"
+                      onClick={() => submitPostQualityFeedback("liked")}
+                    >
+                      👍 Yes, I like it
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      className="flex-1 h-10 text-xs rounded-lg font-medium"
+                      onClick={() => submitPostQualityFeedback("disliked")}
+                    >
+                      👎 Needs work
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Post Quality Feedback Confirmation */}
+              {postQualityRating && (
+                <div className={`${postQualityRating === 'liked' ? 'bg-emerald-500/10 border-emerald-500/25' : 'bg-amber-500/10 border-amber-500/25'} border-2 rounded-xl p-4 animate-in fade-in zoom-in-95 duration-300`}>
+                  <p className="text-sm font-bold">
+                    {postQualityRating === 'liked' ? '✅ Feedback saved! PostAura is learning.' : '📝 Thanks for the feedback! Next post will be better.'}
+                  </p>
                 </div>
               )}
 

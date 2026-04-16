@@ -430,4 +430,77 @@ router.get("/surveys/:surveyId/results", async (req: AuthRequest, res) => {
   }
 });
 
+// ── Post Quality Feedback ──────────────────────────
+router.get("/post-feedback", async (_req: AuthRequest, res) => {
+  try {
+    const db = getAdminDb();
+    const snapshot = await db
+      .collection("analytics")
+      .where("type", "==", "post-feedback")
+      .get();
+
+    const feedback: any[] = [];
+    for (const doc of snapshot.docs) {
+      const data = doc.data();
+      feedback.push({
+        _id: doc.id,
+        userId: data.userId,
+        userName: data.userName,
+        userEmail: data.userEmail,
+        postContent: data.postContent,
+        topic: data.topic,
+        audience: data.audience,
+        tone: data.tone,
+        rating: data.rating,
+        timestamp: data.timestamp?.toDate?.() || new Date(),
+      });
+    }
+
+    // Sort by timestamp descending, then limit to 100
+    const sortedFeedback = feedback
+      .sort((a: any, b: any) => {
+        const timeA = a.timestamp?.getTime?.() || 0;
+        const timeB = b.timestamp?.getTime?.() || 0;
+        return timeB - timeA;
+      })
+      .slice(0, 100);
+
+    res.json({ feedback: sortedFeedback });
+  } catch (error: unknown) {
+    console.error("Post feedback fetch failed:", error);
+    res.status(500).json({ error: "Failed to fetch post feedback" });
+  }
+});
+
+router.post("/post-feedback", async (req: AuthRequest, res) => {
+  try {
+    const { userId, userName, userEmail, postContent, topic, audience, tone, rating } = req.body;
+    
+    if (!userId || !rating || !postContent) {
+      return res.status(400).json({ error: "Missing required fields" });
+    }
+
+    const db = getAdminDb();
+    
+    // Save to Firestore analytics collection
+    await db.collection("analytics").add({
+      type: "post-feedback",
+      userId,
+      userName,
+      userEmail,
+      postContent: postContent.substring(0, 500), // Limit content length
+      topic,
+      audience,
+      tone,
+      rating, // "liked" or "disliked"
+      timestamp: new Date(),
+    });
+
+    res.json({ success: true, message: "Feedback recorded" });
+  } catch (error: unknown) {
+    console.error("Post feedback save failed:", error);
+    res.status(500).json({ error: "Failed to save feedback" });
+  }
+});
+
 export default router;
