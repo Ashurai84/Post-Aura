@@ -249,6 +249,53 @@ router.get("/errors", async (_req: AuthRequest, res) => {
   }
 });
 
+// ── Image Generation Tracking ──────────────────────
+router.get("/images", async (_req: AuthRequest, res) => {
+  try {
+    const db = getAdminDb();
+    const snapshot = await db
+      .collection("analytics")
+      .where("type", "==", "image-generated")
+      .orderBy("timestamp", "desc")
+      .limit(100)
+      .get();
+
+    const images: any[] = [];
+    for (const doc of snapshot.docs) {
+      const data = doc.data();
+      const userId = data.userId;
+      
+      // Get user info
+      let userName = "Unknown User";
+      let userEmail = "unknown@email.com";
+      try {
+        const userDoc = await db.collection("users").doc(userId).get();
+        if (userDoc.exists) {
+          const userData = userDoc.data();
+          userName = userData?.name || "Unnamed";
+          userEmail = userData?.email || "unknown@email.com";
+        }
+      } catch (e) {
+        console.warn("Could not fetch user info:", e);
+      }
+
+      images.push({
+        _id: doc.id,
+        userId,
+        userName,
+        userEmail,
+        timestamp: data.timestamp?.toDate?.() || new Date(),
+        type: "image-generated",
+      });
+    }
+
+    res.json({ images });
+  } catch (error: unknown) {
+    console.error("Image generation fetch failed:", error);
+    res.status(500).json({ error: "Failed to fetch image generations" });
+  }
+});
+
 // ── Survey Management ──────────────────────────────
 router.get("/surveys", async (_req: AuthRequest, res) => {
   try {

@@ -62,11 +62,23 @@ interface FeedbackItem {
 }
 
 interface ErrorItem {
+  _id?: string;
+  message: string;
   timestamp?: string;
-  method: string;
-  route: string;
-  statusCode: number;
-  error: string;
+  stack?: string;
+  userId?: string;
+  method?: string;
+  route?: string;
+  statusCode?: number;
+  error?: string;
+}
+
+interface ImageGeneration {
+  _id: string;
+  userId: string;
+  userName: string;
+  userEmail: string;
+  timestamp: string | { seconds: number };
 }
 
 interface SurveyOption {
@@ -89,11 +101,10 @@ export default function AdminDashboard() {
   const [userData, setUserData] = useState<UserData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'users' | 'feedback' | 'errors' | 'surveys'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'feedback' | 'errors' | 'surveys' | 'images'>('users');
   const [feedback, setFeedback] = useState<FeedbackItem[]>([]);
   const [errorsData, setErrorsData] = useState<ErrorItem[]>([]);
-  const [surveys, setSurveys] = useState<Survey[]>([]);
-  const [modalPost, setModalPost] = useState<{ text: string; user: string; topic: string; time: string } | null>(null);
+  const [surveys, setSurveys] = useState<Survey[]>([]);  const [images, setImages] = useState<ImageGeneration[]>([]);  const [modalPost, setModalPost] = useState<{ text: string; user: string; topic: string; time: string } | null>(null);
   const [modalCopied, setModalCopied] = useState(false);
   const navigate = useNavigate();
 
@@ -150,6 +161,14 @@ export default function AdminDashboard() {
             setSurveys(sData.surveys ?? []);
           }
         } catch (e) { console.error('[PostAura] Failed to fetch surveys', e); }
+
+        try {
+          const iRes = await fetch(`${getApiBase()}/api/admin/images`, { headers: { Authorization: `Bearer ${token}` } });
+          if (iRes.ok) {
+            const iData: { images: ImageGeneration[] } = await iRes.json();
+            setImages(iData.images ?? []);
+          }
+        } catch (e) { console.error('[PostAura] Failed to fetch images', e); }
 
       } catch (err: unknown) {
         setError(err instanceof Error ? err.message : 'Something went wrong.');
@@ -299,13 +318,13 @@ export default function AdminDashboard() {
         <div className="flex items-center justify-between flex-wrap gap-3">
           <h2 className="text-xl font-bold">Users &amp; Content</h2>
           <div className="flex gap-1 border rounded-xl p-1 bg-muted/30">
-            {(['users', 'feedback', 'errors', 'surveys'] as const).map(tab => (
+            {(['users', 'feedback', 'errors', 'images', 'surveys'] as const).map(tab => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
                 className={`px-4 py-1.5 rounded-lg text-xs font-semibold uppercase tracking-wider transition-all ${activeTab === tab ? 'bg-card shadow text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
               >
-                {tab === 'users' ? 'Users' : tab === 'feedback' ? 'Feedback' : tab === 'errors' ? 'Error Logs' : 'Surveys'}
+                {tab === 'users' ? 'Users' : tab === 'feedback' ? 'Feedback' : tab === 'errors' ? 'Error Logs' : tab === 'images' ? 'Images' : 'Surveys'}
               </button>
             ))}
           </div>
@@ -429,8 +448,8 @@ export default function AdminDashboard() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="text-emerald-200 truncate">{err.route}</span>
-                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${err.statusCode >= 500 ? 'bg-red-500/20 text-red-400' : err.statusCode >= 400 ? 'bg-amber-500/20 text-amber-400' : 'bg-emerald-500/20 text-emerald-400'}`}>
-                      {err.statusCode}
+                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${(err.statusCode || 500) >= 500 ? 'bg-red-500/20 text-red-400' : (err.statusCode || 500) >= 400 ? 'bg-amber-500/20 text-amber-400' : 'bg-emerald-500/20 text-emerald-400'}`}>
+                      {err.statusCode || 500}
                     </span>
                   </div>
                   <div className="text-red-400 mt-0.5 opacity-80 group-hover:opacity-100 break-words">{err.error}</div>
@@ -474,6 +493,29 @@ export default function AdminDashboard() {
                       </div>
                     );
                   })}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {activeTab === 'images' && (
+          <div className="space-y-3">
+            {images.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16 gap-3 text-muted-foreground">
+                <ImageIcon className="w-8 h-8" />
+                <p className="font-mono text-sm">No images generated yet.</p>
+              </div>
+            ) : images.map((img, i) => (
+              <div key={img._id ?? i} className="flex flex-col sm:flex-row gap-4 justify-between items-start border rounded-2xl p-4 hover:bg-muted/20 transition-colors">
+                <div className="space-y-1.5 flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-mono text-sm font-semibold text-primary">{img.userName}</span>
+                    <span className="text-xs text-muted-foreground">{img.userEmail}</span>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Generated: {new Date(typeof img.timestamp === 'object' && 'seconds' in img.timestamp ? img.timestamp.seconds * 1000 : img.timestamp).toLocaleString()}
+                  </p>
                 </div>
               </div>
             ))}
