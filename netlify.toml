@@ -1,0 +1,14 @@
+# Netlify Configuration
+[build]
+  command = "npm install && npm run build"
+  publish = "frontend/dist"
+
+# Disable secrets scanning for expected environment variables
+[context.production.environment]
+  SECRETS_SCAN_OMIT_KEYS = "VITE_FIREBASE_FIRESTORE_DATABASE_ID,VITE_API_URL"
+
+# Rewrite rules for SPA
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
