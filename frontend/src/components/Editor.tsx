@@ -150,6 +150,7 @@ export function Editor({ post, userId, onPostUpdated, onStartNewPost, onDeletePo
   const [postsAnalyzed, setPostsAnalyzed] = useState(0);
   const [showPostQualityFeedback, setShowPostQualityFeedback] = useState(false);
   const [postQualityRating, setPostQualityRating] = useState<"liked" | "disliked" | null>(null);
+  const [alternativeHashtags, setAlternativeHashtags] = useState<string[]>([]);
   const [hashtags, setHashtags] = useState<string[]>([]);
   const [hashtagCount, setHashtagCount] = useState<3 | 5 | 10>(5);
   const [bestPostingTime, setBestPostingTime] = useState<{ label: string; reason: string } | null>(null);
@@ -172,6 +173,7 @@ export function Editor({ post, userId, onPostUpdated, onStartNewPost, onDeletePo
       } else {
         setHashtagCount(5);
       }
+      setAlternativeHashtags([]);
       setBestPostingTime(post.bestPostingTime || null);
       setPhase("result");
     } else {
@@ -189,6 +191,7 @@ export function Editor({ post, userId, onPostUpdated, onStartNewPost, onDeletePo
       setShowHistory(false);
       setIsEditing(false);
       setHashtags([]);
+      setAlternativeHashtags([]);
       setHashtagCount(5);
       setBestPostingTime(null);
     }
@@ -473,6 +476,7 @@ export function Editor({ post, userId, onPostUpdated, onStartNewPost, onDeletePo
     setTone("");
     setHistory([]);
     setHashtags([]);
+    setAlternativeHashtags([]);
     setHashtagCount(5);
     setBestPostingTime(null);
     setShowAdvanced(false);
@@ -942,7 +946,9 @@ export function Editor({ post, userId, onPostUpdated, onStartNewPost, onDeletePo
                       <div className="flex items-center justify-between gap-2 mb-3">
                         <div className="flex items-center gap-2">
                           <Hash className="h-4 w-4 text-violet-600" />
-                          <p className="text-xs font-semibold uppercase tracking-wider text-violet-700 dark:text-violet-400">More hashtags to try</p>
+                          <p className="text-xs font-semibold uppercase tracking-wider text-violet-700 dark:text-violet-400">
+                            {alternativeHashtags.length > 0 ? "Alternative hashtags" : "Try different hashtags"}
+                          </p>
                         </div>
                         <Button
                           variant="ghost"
@@ -959,7 +965,7 @@ export function Editor({ post, userId, onPostUpdated, onStartNewPost, onDeletePo
                               hashtagCount
                             )
                               .then(({ hashtags: newHashtags }) => {
-                                setHashtags(newHashtags || []);
+                                setAlternativeHashtags(newHashtags || []);
                               })
                               .catch((error) => {
                                 console.error("Hashtag regeneration error:", error);
@@ -973,20 +979,30 @@ export function Editor({ post, userId, onPostUpdated, onStartNewPost, onDeletePo
                           {isGenerating ? (
                             <><Loader2 className="h-3 w-3 animate-spin mr-1" /> Generating...</>
                           ) : (
-                            <>✨ Different hashtags</>
+                            <>✨ {alternativeHashtags.length > 0 ? "Generate more" : "Generate"}</>
                           )}
                         </Button>
                       </div>
-                      <div className="flex flex-wrap gap-1.5">
-                        {displayHashtags.map((tag) => (
-                          <span
-                            key={tag}
-                            className="text-[11px] px-2 py-1 rounded-full bg-violet-500/10 text-violet-700 dark:text-violet-300 border border-violet-500/20"
-                          >
-                            {tag}
-                          </span>
-                        ))}
-                      </div>
+                      {alternativeHashtags.length > 0 && (
+                        <>
+                          <div className="flex flex-wrap gap-1.5 mb-3">
+                            {alternativeHashtags.map((tag) => (
+                              <span
+                                key={tag}
+                                className="text-[11px] px-2 py-1 rounded-full bg-violet-500/10 text-violet-700 dark:text-violet-300 border border-violet-500/20 hover:bg-violet-500/20 cursor-pointer transition-colors"
+                                onClick={() => {
+                                  setHashtags(alternativeHashtags);
+                                  setAlternativeHashtags([]);
+                                }}
+                                title="Click to use these hashtags"
+                              >
+                                {tag}
+                              </span>
+                            ))}
+                          </div>
+                          <p className="text-[10px] text-muted-foreground">Click any hashtag set to use it in your post</p>
+                        </>
+                      )}
                     </div>
                   )}
                 </div>
