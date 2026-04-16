@@ -68,7 +68,7 @@ export async function synthesizePost(
   if (voiceProfile) {
     const parts: string[] = [];
 
-    // Direct corrections from 👎 feedback (strongest signals)
+    // Voice profile preferences
     if (voiceProfile.prefersCasual) {
       parts.push("IMPORTANT: Write CASUALLY. Sound like a college student sharing with friends, not a corporate exec. Use simple words and short sentences.");
     }
@@ -100,7 +100,7 @@ export async function synthesizePost(
     }
 
     if (parts.length > 0) {
-      const postsInfo = voiceProfile.postsAnalyzed ? ` from ${voiceProfile.postsAnalyzed} posts + direct feedback` : " from direct feedback";
+      const postsInfo = voiceProfile.postsAnalyzed ? ` from ${voiceProfile.postsAnalyzed} posts` : " from profile analysis";
       voiceInstructions = `\n    VOICE PROFILE (learned${postsInfo} — STRICTLY match this style):\n    ${parts.join("\n    ")}`;
     }
   }
