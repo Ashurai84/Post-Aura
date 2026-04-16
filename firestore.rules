@@ -1,0 +1,100 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // 🔐 SECURITY RULES - PostAura Firestore Database
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() && 
+             get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.role == 'admin';
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function isValidUser(userId) {
+      return userId.matches('[a-zA-Z0-9]+');
+    }
+    
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // 👥 USERS COLLECTION - Users can only see their own data
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    match /users/{userId} {
+      // Users can read their own profile
+      allow read: if isOwner(userId);
+      
+      // Users can update their own profile
+      allow update: if isOwner(userId) && 
+                       isValidUser(userId) &&
+                       !request.resource.data.diff(resource.data).affectedKeys()
+                         .hasAny(['uid', 'email', 'createdAt']);
+      
+      // Users can create their profile on first signup
+      allow create: if isOwner(userId) &&
+                       request.resource.data.uid == userId &&
+                       request.resource.data.email == request.auth.token.email &&
+                       request.resource.data.createdAt == request.time;
+      
+      // Deny delete
+      allow delete: if false;
+    }
+    
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // 📝 POSTS COLLECTION - Users can see their own posts
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    match /posts/{postId} {
+      // Users can read their own posts
+      allow read: if isOwner(resource.data.userId);
+      
+      // Users can create posts for themselves
+      allow create: if isOwner(request.resource.data.userId) &&
+                       request.resource.data.userId == request.auth.uid &&
+                       request.resource.data.createdAt == request.time &&
+                       isValidUser(request.resource.data.userId);
+      
+      // Users can update their own posts
+      allow update: if isOwner(resource.data.userId) &&
+                       resource.data.userId == request.resource.data.userId &&
+                       !request.resource.data.diff(resource.data).affectedKeys()
+                         .hasAny(['userId', 'createdAt', 'uid']);
+      
+      // Users can delete their own posts
+      allow delete: if isOwner(resource.data.userId);
+    }
+    
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // 📊 ANALYTICS COLLECTION - Backend writes, frontend cannot access
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    match /analytics/{analyticsId} {
+      // Only backend (via service account) can write analytics
+      allow read, write: if false; // Frontend has NO access
+      // Backend writes via Admin SDK (bypasses rules)
+    }
+    
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // 👨‍💼 ADMINS COLLECTION - Only admins can access
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    match /admins/{adminId} {
+      // Only admins can read admin data
+      allow read, write: if isAdmin();
+      
+      allow create: if false; // Manually add admins only
+      allow delete: if false;
+    }
+    
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // 🔒 DENY ALL OTHER ACCESS
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
