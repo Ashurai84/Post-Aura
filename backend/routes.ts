@@ -6,6 +6,7 @@ import { verifyFirebaseToken, AuthRequest } from "./middleware/auth";
 import { checkUsage } from "./middleware/checkUsage";
 import { getAdminDb, FieldValue } from "./services/firebaseAdmin";
 import { Survey, SurveyResponse } from "./models/Survey.model";
+import { Feedback } from "./models/Feedback.model";
 
 const router = express.Router();
 
@@ -406,6 +407,35 @@ router.post("/ai/voice-feedback", verifyFirebaseToken, async (req: AuthRequest, 
   } catch (error) {
     console.warn("Voice feedback error:", error);
     res.json({ ok: true }); // Don't fail the user experience
+  }
+});
+
+// General feedback submission endpoint
+router.post("/voice-feedback", verifyFirebaseToken, async (req: AuthRequest, res) => {
+  try {
+    const { type, message, rating, page } = req.body;
+    
+    const feedback = await Feedback.create({
+      userId: req.user!.uid,
+      type: type || "suggestion",
+      message,
+      rating: rating || 5,
+      page: page || "unknown",
+      submittedAt: new Date(),
+    });
+
+    console.log("[PostAura] Feedback submitted:", {
+      userId: req.user!.uid,
+      type,
+      rating,
+      page,
+      message: message.substring(0, 50) + "...",
+    });
+
+    res.json({ ok: true, feedbackId: feedback._id });
+  } catch (error) {
+    console.error("Feedback submission failed:", error);
+    res.status(500).json({ error: "Failed to submit feedback" });
   }
 });
 

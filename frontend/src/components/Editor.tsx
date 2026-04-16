@@ -5,6 +5,7 @@ import { Textarea } from "./ui/textarea";
 import { Input } from "./ui/input";
 import { synthesizePost, iteratePost, SynthesizeResult } from "../lib/gemini";
 import { Post, HistoryItem } from "../types";
+import { FeedbackForm } from "./FeedbackForm";
 import {
   Loader2, Copy, Check, ArrowRight, Wand2,
   Undo2, History as HistoryIcon, Trash2, RotateCcw,
@@ -788,6 +789,7 @@ export function Editor({ post, userId, onPostUpdated, onStartNewPost, onDeletePo
                     <Button variant="ghost" size="sm" className="h-8 px-2.5 text-xs" onClick={() => setShowHistory(!showHistory)}>
                       <HistoryIcon className="h-3.5 w-3.5 mr-1" /> {history.length}
                     </Button>
+                    <FeedbackForm userId={userId} />
                   </div>
                 </div>
 
