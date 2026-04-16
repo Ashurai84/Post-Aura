@@ -132,93 +132,117 @@ export default function AdminDashboard() {
   const [paymentClicks, setPaymentClicks] = useState<PaymentClick[]>([]);
   const [modalPost, setModalPost] = useState<{ text: string; user: string; topic: string; time: string } | null>(null);
   const [modalCopied, setModalCopied] = useState(false);
+  const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const navigate = useNavigate();
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const user = auth.currentUser;
-        if (!user) { navigate('/', { replace: true }); return; }
-        const token = await user.getIdToken();
+  const fetchData = async (isInitial = false) => {
+    try {
+      if (!isInitial) setIsRefreshing(true);
+      const user = auth.currentUser;
+      if (!user) { navigate('/', { replace: true }); return; }
+      const token = await user.getIdToken();
 
-        const statsResponse = await fetch(`${getApiBase()}/api/admin/stats`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const statsRaw = await statsResponse.text();
-        if (statsRaw.trimStart().toLowerCase().startsWith('<!')) {
-          throw new Error('Got HTML instead of API data. Set VITE_API_URL=http://localhost:3000');
-        }
-        let statsPayload: unknown;
-        try { statsPayload = JSON.parse(statsRaw); } catch { throw new Error('Invalid response from server.'); }
-        if (!statsResponse.ok) {
-          const err = statsPayload as { error?: string };
-          throw new Error(statsResponse.status === 403 ? (err.error ?? 'Access denied.') : (err.error ?? 'Failed to fetch admin stats.'));
-        }
-        setStats(statsPayload as Stats);
-
-        const userResponse = await fetch(`${getApiBase()}/api/admin/user-data`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const userRaw = await userResponse.text();
-        let userPayload: { users?: UserData[] };
-        try { userPayload = JSON.parse(userRaw); } catch { console.error('[PostAura] Failed to parse user data'); return; }
-        if (userResponse.ok && userPayload.users) setUserData(userPayload.users);
-
-        try {
-          const fRes = await fetch(`${getApiBase()}/api/admin/feedback`, { headers: { Authorization: `Bearer ${token}` } });
-          if (fRes.ok) {
-            const fData: FeedbackItem[] | { feedback: FeedbackItem[] } = await fRes.json();
-            setFeedback(Array.isArray(fData) ? fData : (fData.feedback ?? []));
-          }
-        } catch (e) { console.error('[PostAura] Failed to fetch feedback', e); }
-
-        try {
-          const pfRes = await fetch(`${getApiBase()}/api/admin/post-feedback`, { headers: { Authorization: `Bearer ${token}` } });
-          if (pfRes.ok) {
-            const pfData: { feedback?: PostFeedback[] } = await pfRes.json();
-            setPostFeedback(pfData.feedback ?? []);
-          }
-        } catch (e) { console.error('[PostAura] Failed to fetch post feedback', e); }
-
-        try {
-          const eRes = await fetch(`${getApiBase()}/api/admin/errors`, { headers: { Authorization: `Bearer ${token}` } });
-          if (eRes.ok) {
-            const eData: { errors?: ErrorItem[] } | ErrorItem[] = await eRes.json();
-            setErrorsData(Array.isArray(eData) ? eData : (eData.errors ?? []));
-          }
-        } catch (e) { console.error('[PostAura] Failed to fetch errors', e); }
-
-        try {
-          const sRes = await fetch(`${getApiBase()}/api/admin/surveys`, { headers: { Authorization: `Bearer ${token}` } });
-          if (sRes.ok) {
-            const sData: { surveys?: Survey[] } = await sRes.json();
-            setSurveys(sData.surveys ?? []);
-          }
-        } catch (e) { console.error('[PostAura] Failed to fetch surveys', e); }
-
-        try {
-          const iRes = await fetch(`${getApiBase()}/api/admin/images`, { headers: { Authorization: `Bearer ${token}` } });
-          if (iRes.ok) {
-            const iData: { images: ImageGeneration[] } = await iRes.json();
-            setImages(iData.images ?? []);
-          }
-        } catch (e) { console.error('[PostAura] Failed to fetch images', e); }
-
-        try {
-          const pcRes = await fetch(`${getApiBase()}/api/admin/payment-clicks`, { headers: { Authorization: `Bearer ${token}` } });
-          if (pcRes.ok) {
-            const pcData: { clicks: PaymentClick[] } = await pcRes.json();
-            setPaymentClicks(pcData.clicks ?? []);
-          }
-        } catch (e) { console.error('[PostAura] Failed to fetch payment clicks', e); }
-
-      } catch (err: unknown) {
-        setError(err instanceof Error ? err.message : 'Something went wrong.');
-      } finally {
-        setLoading(false);
+      // Fetch stats
+      const statsResponse = await fetch(`${getApiBase()}/api/admin/stats`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const statsRaw = await statsResponse.text();
+      if (statsRaw.trimStart().toLowerCase().startsWith('<!')) {
+        throw new Error('Got HTML instead of API data. Set VITE_API_URL=http://localhost:3000');
       }
-    };
-    fetchData();
+      let statsPayload: unknown;
+      try { statsPayload = JSON.parse(statsRaw); } catch { throw new Error('Invalid response from server.'); }
+      if (!statsResponse.ok) {
+        const err = statsPayload as { error?: string };
+        throw new Error(statsResponse.status === 403 ? (err.error ?? 'Access denied.') : (err.error ?? 'Failed to fetch admin stats.'));
+      }
+      setStats(statsPayload as Stats);
+
+      // Fetch user data
+      const userResponse = await fetch(`${getApiBase()}/api/admin/user-data`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const userRaw = await userResponse.text();
+      let userPayload: { users?: UserData[] };
+      try { userPayload = JSON.parse(userRaw); } catch { console.error('[PostAura] Failed to parse user data'); return; }
+      if (userResponse.ok && userPayload.users) setUserData(userPayload.users);
+
+      // Fetch feedback
+      try {
+        const fRes = await fetch(`${getApiBase()}/api/admin/feedback`, { headers: { Authorization: `Bearer ${token}` } });
+        if (fRes.ok) {
+          const fData: FeedbackItem[] | { feedback: FeedbackItem[] } = await fRes.json();
+          setFeedback(Array.isArray(fData) ? fData : (fData.feedback ?? []));
+        }
+      } catch (e) { console.error('[PostAura] Failed to fetch feedback', e); }
+
+      // Fetch post feedback
+      try {
+        const pfRes = await fetch(`${getApiBase()}/api/admin/post-feedback`, { headers: { Authorization: `Bearer ${token}` } });
+        if (pfRes.ok) {
+          const pfData: { feedback?: PostFeedback[] } = await pfRes.json();
+          setPostFeedback(pfData.feedback ?? []);
+        }
+      } catch (e) { console.error('[PostAura] Failed to fetch post feedback', e); }
+
+      // Fetch errors
+      try {
+        const eRes = await fetch(`${getApiBase()}/api/admin/errors`, { headers: { Authorization: `Bearer ${token}` } });
+        if (eRes.ok) {
+          const eData: { errors?: ErrorItem[] } | ErrorItem[] = await eRes.json();
+          setErrorsData(Array.isArray(eData) ? eData : (eData.errors ?? []));
+        }
+      } catch (e) { console.error('[PostAura] Failed to fetch errors', e); }
+
+      // Fetch surveys
+      try {
+        const sRes = await fetch(`${getApiBase()}/api/admin/surveys`, { headers: { Authorization: `Bearer ${token}` } });
+        if (sRes.ok) {
+          const sData: { surveys?: Survey[] } = await sRes.json();
+          setSurveys(sData.surveys ?? []);
+        }
+      } catch (e) { console.error('[PostAura] Failed to fetch surveys', e); }
+
+      // Fetch images
+      try {
+        const iRes = await fetch(`${getApiBase()}/api/admin/images`, { headers: { Authorization: `Bearer ${token}` } });
+        if (iRes.ok) {
+          const iData: { images: ImageGeneration[] } = await iRes.json();
+          setImages(iData.images ?? []);
+        }
+      } catch (e) { console.error('[PostAura] Failed to fetch images', e); }
+
+      // Fetch payment clicks
+      try {
+        const pcRes = await fetch(`${getApiBase()}/api/admin/payment-clicks`, { headers: { Authorization: `Bearer ${token}` } });
+        if (pcRes.ok) {
+          const pcData: { clicks: PaymentClick[] } = await pcRes.json();
+          setPaymentClicks(pcData.clicks ?? []);
+        }
+      } catch (e) { console.error('[PostAura] Failed to fetch payment clicks', e); }
+
+      setLastRefresh(new Date());
+      if (isInitial) setLoading(false);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Something went wrong.');
+      if (isInitial) setLoading(false);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  // ✅ REAL-TIME UPDATES: Fetch data on mount and set up polling
+  useEffect(() => {
+    fetchData(true); // Initial fetch
+
+    // Set up polling - refresh every 5 seconds
+    const pollInterval = setInterval(() => {
+      fetchData(false);
+    }, 5000); // 5 second refresh interval
+
+    // Cleanup interval on unmount
+    return () => clearInterval(pollInterval);
   }, [navigate]);
 
   const handleDeleteUser = async (userId: string) => {
@@ -284,11 +308,30 @@ export default function AdminDashboard() {
             <ArrowLeft className="h-3 w-3" /> Back to App
           </button>
           <h1 className="text-3xl font-bold tracking-tight">PostAura Command Center</h1>
-          <p className="text-muted-foreground">Real-time growth and intent analytics.</p>
+          <p className="text-muted-foreground">Real-time growth and intent analytics — Refreshing every 5 seconds</p>
         </div>
-        <div className="bg-background border rounded-2xl px-4 py-2 flex items-center gap-3 shadow-sm">
-          <div className="h-2 w-2 bg-emerald-500 rounded-full animate-pulse" />
-          <span className="text-sm font-medium">Live System Monitoring</span>
+        <div className="flex items-center gap-3">
+          <div className="bg-background border rounded-2xl px-4 py-2 flex items-center gap-3 shadow-sm">
+            <div className="h-2 w-2 bg-emerald-500 rounded-full animate-pulse" />
+            <span className="text-sm font-medium">
+              {isRefreshing ? 'Updating...' : 'Live'}
+            </span>
+            {lastRefresh && (
+              <span className="text-xs text-muted-foreground ml-2">
+                Last: {lastRefresh.toLocaleTimeString()}
+              </span>
+            )}
+          </div>
+          <Button
+            onClick={() => fetchData(false)}
+            disabled={isRefreshing}
+            variant="outline"
+            size="sm"
+            className="rounded-xl"
+          >
+            <Loader2 className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            {isRefreshing ? 'Refreshing' : 'Refresh'}
+          </Button>
         </div>
       </div>
 
