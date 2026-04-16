@@ -867,9 +867,43 @@ export function Editor({ post, userId, onPostUpdated, onStartNewPost, onDeletePo
 
                   {displayHashtags.length > 0 && (
                     <div className="bg-linear-to-r from-violet-500/10 to-fuchsia-500/5 border border-violet-500/20 rounded-xl p-4">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Hash className="h-4 w-4 text-violet-600" />
-                        <p className="text-xs font-semibold uppercase tracking-wider text-violet-700 dark:text-violet-400">Suggested hashtags</p>
+                      <div className="flex items-center justify-between gap-2 mb-3">
+                        <div className="flex items-center gap-2">
+                          <Hash className="h-4 w-4 text-violet-600" />
+                          <p className="text-xs font-semibold uppercase tracking-wider text-violet-700 dark:text-violet-400">Suggested hashtags</p>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 px-2 text-[10px] font-semibold text-violet-600 hover:bg-violet-100 dark:hover:bg-violet-500/20 transition-all"
+                          onClick={() => {
+                            setIsGenerating(true);
+                            iteratePost(
+                              content,
+                              `Generate a completely different set of ${hashtagCount} hashtags. Use different hashtag topics and styles than before.`,
+                              topic,
+                              audience,
+                              hashtags,
+                              hashtagCount
+                            )
+                              .then(({ hashtags: newHashtags }) => {
+                                setHashtags(newHashtags || []);
+                              })
+                              .catch((error) => {
+                                console.error("Hashtag regeneration error:", error);
+                              })
+                              .finally(() => {
+                                setIsGenerating(false);
+                              });
+                          }}
+                          disabled={isGenerating}
+                        >
+                          {isGenerating ? (
+                            <><Loader2 className="h-3 w-3 animate-spin mr-1" /> Generating...</>
+                          ) : (
+                            <>✨ Different hashtags</>
+                          )}
+                        </Button>
                       </div>
                       <div className="flex flex-wrap gap-1.5">
                         {displayHashtags.map((tag) => (
