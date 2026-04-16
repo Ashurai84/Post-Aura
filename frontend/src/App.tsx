@@ -6,7 +6,7 @@ import { Sidebar } from "./components/Sidebar";
 import { Editor } from "./components/Editor";
 import { ImageGenerator } from "./components/ImageGenerator";
 import { LandingPage } from "./components/LandingPage";
-import { LoginPage } from "./components/LoginPage";
+import { AuthPage } from "./components/AuthPage";
 import PaymentSuccess from "./PaymentSuccess";
 import { Post } from "./types";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./components/ui/tabs";
@@ -207,7 +207,7 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <LandingPage />} />
-        <Route path="/login" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <LoginPage />} />
+        <Route path="/login" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <AuthPage />} />
         <Route path="/dashboard" element={isAuthenticated ? (
           <Dashboard 
             user={user} 

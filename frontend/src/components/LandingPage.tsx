@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { motion, useReducedMotion, useScroll, useSpring, useTransform } from "motion/react";
 import {
   CheckCircle2,
@@ -14,9 +15,9 @@ import {
   Timer,
 } from "lucide-react";
 import { Button } from "./ui/button";
-import { signInWithGoogle } from "../firebase";
 
 export function LandingPage() {
+  const navigate = useNavigate();
   const [isSigningIn, setIsSigningIn] = useState(false);
   const shouldReduceMotion = useReducedMotion();
   const [demoState, setDemoState] = useState<"before" | "after">("before");
@@ -54,20 +55,14 @@ export function LandingPage() {
     },
   };
 
-  // Used by all CTA buttons so sign-in behavior stays consistent.
+  // Used by all CTA buttons to navigate to auth page
   const handleSignIn = async () => {
     if (isSigningIn) return;
     setIsSigningIn(true);
-    try {
-      await signInWithGoogle();
-    } catch (error: unknown) {
-      const code = (error as { code?: string })?.code;
-      if (code !== "auth/popup-closed-by-user" && code !== "auth/cancelled-popup-request") {
-        alert("Sign-in failed. Please try again.");
-      }
-    } finally {
-      setIsSigningIn(false);
-    }
+    // Navigate to auth page instead of direct OAuth
+    setTimeout(() => {
+      navigate("/login");
+    }, 100);
   };
 
   const createDemoOutput = (rawInput: string, tone: "crisp" | "story" | "opinion") => {
@@ -125,8 +120,9 @@ export function LandingPage() {
             onClick={handleSignIn}
             variant="outline"
             className="rounded-full px-6 border-white/25 bg-white/10 text-[#F5F3EE] hover:bg-white/20"
+            disabled={isSigningIn}
           >
-            {isSigningIn ? "Signing in..." : "Sign In"}
+            {isSigningIn ? "Redirecting..." : "Start writing"}
           </Button>
         </div>
       </nav>
@@ -379,75 +375,157 @@ export function LandingPage() {
           </div>
         </section>
 
-        <section className="px-6 py-16 bg-[#f7f4ee]">
-          <div className="max-w-6xl mx-auto">
+        <section className="px-6 py-20 bg-gradient-to-b from-[#f7f4ee] via-[#fef9f2] to-[#f7f4ee]">
+          <div className="max-w-7xl mx-auto">
             <motion.div
               initial="hidden"
               whileInView="visible"
-              viewport={{ once: true, amount: 0.35 }}
+              viewport={{ once: true, amount: 0.3 }}
               variants={staggerContainer}
-              className="mb-10"
+              className="text-center mb-16"
             >
-              <motion.h2 variants={fadeUp} className="text-3xl md:text-5xl font-bold tracking-tight text-[#17181d]">Proof from real posting outcomes</motion.h2>
-              <motion.p variants={fadeUp} className="mt-4 text-[#595c66] max-w-3xl">No vanity dashboards here. See direct before-to-after transformations from real creator-style inputs.</motion.p>
+              <motion.p variants={fadeUp} className="text-[11px] uppercase tracking-[0.14em] text-[#f97316] font-semibold">Real transformations</motion.p>
+              <motion.h2 variants={fadeUp} className="text-4xl md:text-6xl font-bold tracking-tight text-[#17181d] mt-3">
+                Write once
+                <br />
+                <span className="relative">
+                  be remembered
+                  <span className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-[#f97316]/60 via-[#f97316] to-[#f97316]/60 rounded-full"></span>
+                </span>
+              </motion.h2>
+              <motion.p variants={fadeUp} className="mt-6 text-lg text-[#595c66] max-w-3xl mx-auto">One thought. One tap. From messy to memorable. Every transformation proves it.</motion.p>
             </motion.div>
 
-            <motion.div initial="hidden" whileInView="visible" viewport={{ once: true, amount: 0.2 }} variants={staggerContainer} className="grid gap-5 lg:grid-cols-2">
-              <motion.div variants={fadeUp} className="rounded-3xl border border-[#e5dccf] bg-white p-6">
-                <p className="text-[11px] uppercase tracking-[0.14em] text-[#7d7368]">Transformation gallery</p>
-                <div className="mt-4 grid gap-3">
-                  {[
-                    {
-                      before: "Spent 2 hours fixing onboarding confusion today.",
-                      after: "I spent two hours on onboarding today, and the issue was not design quality. It was decision overload. We removed three choices and activation jumped immediately. Simpler is harder, but it wins. #ProductDesign #BuildInPublic",
-                    },
-                    {
-                      before: "A recruiter asked for my portfolio and I froze.",
-                      after: "A recruiter asked for my portfolio today, and I realized I had no clear narrative behind my work. Skills are not enough if your story is scattered. This week I am rebuilding my portfolio around outcomes, not just screens. #CareerGrowth #DesignCareer",
-                    },
-                    {
-                      before: "Our first paying user churned in 4 days.",
-                      after: "Our first paying user churned in four days. Painful, but useful. The product was not failing because of features, it was failing because setup felt heavy. We are now rebuilding onboarding before adding anything new. #StartupLessons #SaaS",
-                    },
-                  ].map((item, index) => (
-                    <div key={`transform-${index}`} className="rounded-2xl border border-[#ece3d6] bg-[#fffdf8] p-4">
-                      <p className="text-[11px] uppercase tracking-[0.12em] text-[#7d7368]">Before</p>
-                      <p className="text-sm text-[#22242b] mt-1">{item.before}</p>
-                      <p className="text-[11px] uppercase tracking-[0.12em] text-[#0c5f8e] mt-3">After</p>
-                      <p className="text-sm text-[#2e4f63] mt-1">{item.after}</p>
-                    </div>
-                  ))}
-                </div>
+            {/* Main Transformation Cards */}
+            <motion.div
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true, amount: 0.15 }}
+              variants={staggerContainer}
+              className="grid gap-6 md:gap-8 mb-8"
+            >
+              {[
+                {
+                  icon: "⚡",
+                  title: "The Designer's Block",
+                  before: "Spent 2 hours fixing onboarding confusion today.",
+                  beforeColor: "from-red-50 to-orange-50",
+                  after: "I spent two hours on onboarding today, and the issue was not design quality. It was decision overload. We removed three choices and activation jumped immediately. Simpler is harder, but it wins. #ProductDesign",
+                  afterColor: "from-emerald-50 to-teal-50",
+                },
+                {
+                  icon: "🎯",
+                  title: "The Career Moment",
+                  before: "A recruiter asked for my portfolio and I froze.",
+                  beforeColor: "from-amber-50 to-yellow-50",
+                  after: "A recruiter asked for my portfolio today, and I realized I had no clear narrative. Skills mean nothing if your story is scattered. This week: rebuilding my portfolio around outcomes. #CareerGrowth",
+                  afterColor: "from-blue-50 to-cyan-50",
+                },
+                {
+                  icon: "💔",
+                  title: "The Startup Reality",
+                  before: "Our first paying user churned in 4 days.",
+                  beforeColor: "from-red-50 to-pink-50",
+                  after: "Our first paying user churned in four days. Not because of features—because onboarding felt heavy. We're rebuilding the experience before adding anything new. That's what matters. #StartupLessons",
+                  afterColor: "from-indigo-50 to-purple-50",
+                },
+              ].map((item, index) => (
+                <motion.div
+                  key={`transform-${index}`}
+                  variants={fadeUp}
+                  className="group relative"
+                >
+                  <div className="grid md:grid-cols-2 gap-4 md:gap-6">
+                    {/* BEFORE */}
+                    <motion.div
+                      whileHover={{ scale: shouldReduceMotion ? 1 : 1.02, y: shouldReduceMotion ? 0 : -4 }}
+                      className="rounded-2xl border-2 border-[#e5dccf] bg-gradient-to-br overflow-hidden shadow-md hover:shadow-lg transition-shadow"
+                    >
+                      <div className={`bg-gradient-to-br ${item.beforeColor} h-24 flex items-center justify-center text-4xl`}>
+                        {item.icon}
+                      </div>
+                      <div className="p-5 bg-white">
+                        <div className="inline-flex items-center gap-2 mb-3">
+                          <div className="w-2 h-2 rounded-full bg-[#e5757b]"></div>
+                          <p className="text-[10px] uppercase tracking-[0.12em] font-bold text-[#e5757b]">Before</p>
+                        </div>
+                        <p className="text-base font-semibold text-[#22242b] leading-snug">{item.before}</p>
+                      </div>
+                    </motion.div>
+
+                    {/* AFTER */}
+                    <motion.div
+                      whileHover={{ scale: shouldReduceMotion ? 1 : 1.02, y: shouldReduceMotion ? 0 : -4 }}
+                      className="rounded-2xl border-2 border-[#c5e7d6] bg-gradient-to-br overflow-hidden shadow-md hover:shadow-lg transition-shadow"
+                    >
+                      <div className={`bg-gradient-to-br ${item.afterColor} h-24 flex items-center justify-center text-4xl`}>
+                        ✨
+                      </div>
+                      <div className="p-5 bg-white">
+                        <div className="inline-flex items-center gap-2 mb-3">
+                          <div className="w-2 h-2 rounded-full bg-[#10b981]"></div>
+                          <p className="text-[10px] uppercase tracking-[0.12em] font-bold text-[#10b981]">After</p>
+                        </div>
+                        <p className="text-sm text-[#2e4f63] leading-relaxed">{item.after}</p>
+                      </div>
+                    </motion.div>
+                  </div>
+                </motion.div>
+              ))}
+            </motion.div>
+
+            {/* Creator Proof Section */}
+            <motion.div
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true, amount: 0.2 }}
+              variants={staggerContainer}
+              className="mt-16 pt-12 border-t-2 border-[#e5dccf]"
+            >
+              <motion.div variants={fadeUp} className="text-center mb-8">
+                <p className="text-[11px] uppercase tracking-[0.14em] text-[#f97316] font-semibold">Creator proof</p>
+                <h3 className="text-2xl md:text-3xl font-bold text-[#17181d] mt-2">Who's already writing once, being remembered</h3>
               </motion.div>
 
-              <motion.div variants={fadeUp} className="rounded-3xl border border-[#e5dccf] bg-white p-6">
-                <p className="text-[11px] uppercase tracking-[0.14em] text-[#7d7368]">Creator snapshots</p>
-                <p className="text-xs text-[#6a6258] mt-2">Evidence labels: sample transformation, creator-submitted screenshot, internal product test.</p>
-                <div className="mt-4 grid gap-3">
-                  {[
-                    {
-                      name: "Ankit, Product Designer",
-                      line: "I stopped skipping days because I no longer start from a blank page.",
-                      meta: "Creator-submitted screenshot",
-                    },
-                    {
-                      name: "Riya, Student Founder",
-                      line: "My rough notes now turn into posts that still sound like me.",
-                      meta: "Internal product test",
-                    },
-                  ].map((quote) => (
-                    <div key={quote.name} className="rounded-2xl border border-[#ece3d6] bg-[#fffdf8] p-4">
-                      <div className="flex items-start gap-2">
-                        <Quote className="h-4 w-4 mt-0.5 text-[#f97316]" />
-                        <div>
-                          <p className="text-sm text-[#20222a]">{quote.line}</p>
-                          <p className="mt-2 text-xs text-[#61666f]">{quote.name}</p>
-                          <p className="text-xs text-[#0c5f8e]">{quote.meta}</p>
-                        </div>
+              <motion.div variants={staggerContainer} className="grid md:grid-cols-2 gap-6">
+                {[
+                  {
+                    avatar: "A",
+                    name: "Ankit",
+                    role: "Product Designer",
+                    quote: "I stopped skipping days because I no longer start from a blank page.",
+                    proof: "Creator-submitted screenshot",
+                    gradient: "from-blue-100 to-cyan-100",
+                  },
+                  {
+                    avatar: "R",
+                    name: "Riya",
+                    role: "Student Founder",
+                    quote: "My rough notes now turn into posts that still sound like me.",
+                    proof: "Internal product test",
+                    gradient: "from-purple-100 to-pink-100",
+                  },
+                ].map((creator) => (
+                  <motion.div
+                    key={creator.name}
+                    variants={fadeUp}
+                    className="rounded-2xl border-2 border-[#e5dccf] bg-white p-6 hover:border-[#f97316]/30 transition-colors"
+                  >
+                    <div className="flex items-start gap-4">
+                      <div className={`w-12 h-12 rounded-full bg-gradient-to-br ${creator.gradient} flex items-center justify-center font-bold text-lg text-white flex-shrink-0`}>
+                        {creator.avatar}
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-semibold text-[#17181d]">{creator.name}</p>
+                        <p className="text-xs text-[#595c66]">{creator.role}</p>
+                        <blockquote className="mt-3 text-sm text-[#20222a] italic border-l-3 border-[#f97316] pl-3">
+                          "{creator.quote}"
+                        </blockquote>
+                        <p className="mt-3 text-xs uppercase tracking-[0.1em] text-[#0c5f8e] font-medium">{creator.proof}</p>
                       </div>
                     </div>
-                  ))}
-                </div>
+                  </motion.div>
+                ))}
               </motion.div>
             </motion.div>
           </div>
@@ -517,11 +595,12 @@ export function LandingPage() {
 
               <motion.div variants={fadeUp}>
                 <Button
-                  onClick={triggerDemo}
+                  onClick={handleSignIn}
                   size="lg"
                   className="rounded-full h-12 px-8 text-base bg-[#f97316] text-white hover:bg-[#fb8a35]"
+                  disabled={isSigningIn}
                 >
-                  Try your first post now
+                  {isSigningIn ? "Redirecting..." : "Get started writing crazy posts"}
                 </Button>
               </motion.div>
 
@@ -530,8 +609,9 @@ export function LandingPage() {
                   onClick={handleSignIn}
                   variant="ghost"
                   className="text-[#ded2c4] hover:text-white hover:bg-white/10"
+                  disabled={isSigningIn}
                 >
-                  {isSigningIn ? "Signing in..." : "Sign in to save your posts"}
+                  {isSigningIn ? "Redirecting..." : "Start your best post now"}
                 </Button>
               </motion.div>
             </motion.div>
