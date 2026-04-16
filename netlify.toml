@@ -1,0 +1,11 @@
+[build]
+  command = "npm install && npm run build"
+  publish = "frontend/dist"
+  base = ""
+
+[build.cache]
+  skip_cache = false
+
+[context.production]
+  command = "npm install --force && npm run build"
+  publish = "frontend/dist"
