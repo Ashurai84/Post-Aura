@@ -1,24 +1,11 @@
 import express from "express";
-import { verifyFirebaseToken, AuthRequest } from "../middleware/auth";
+import { verifyFirebaseToken, AuthRequest, requireAdminEmail } from "../middleware/auth";
 import { getAdminDb, getAdminAuth } from "../services/firebaseAdmin";
 import { Feedback } from "../models/Feedback.model";
 import { ErrorLog } from "../models/ErrorLog.model";
 import { Survey, SurveyResponse } from "../models/Survey.model";
 
 const router = express.Router();
-
-const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || "")
-  .split(",")
-  .map((e) => e.trim().toLowerCase())
-  .filter(Boolean);
-
-function requireAdminEmail(req: AuthRequest, res: express.Response, next: express.NextFunction) {
-  const email = (req.user?.email || "").toLowerCase();
-  if (!ADMIN_EMAILS.includes(email)) {
-    return res.status(403).json({ error: "Access denied. Admin only." });
-  }
-  next();
-}
 
 router.get("/health", (_req, res) => {
   res.json({ status: "ok", message: "Admin routes correctly mounted" });
