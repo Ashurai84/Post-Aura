@@ -5,6 +5,7 @@ import adminRoutes from "./routes/admin";
 import { verifyFirebaseToken, AuthRequest } from "./middleware/auth";
 import { checkUsage } from "./middleware/checkUsage";
 import { getAdminDb, FieldValue } from "./services/firebaseAdmin";
+import { Survey, SurveyResponse } from "./models/Survey.model";
 
 const router = express.Router();
 
@@ -422,6 +423,64 @@ router.post("/analytics/track-intent", verifyFirebaseToken, async (req: AuthRequ
   } catch (error) {
     console.warn("Intent tracking failed:", error);
     res.json({ ok: true });
+  }
+});
+
+// ── Survey Submission ──────────────────────────────
+router.get("/survey/active", async (_req, res) => {
+  try {
+    const survey = await Survey.findOne({ isActive: true }).sort({ createdAt: -1 });
+    res.json({ survey: survey || null });
+  } catch (error: unknown) {
+    console.error("Active survey fetch failed:", error);
+    res.status(500).json({ error: "Failed to fetch survey" });
+  }
+});
+
+router.post("/survey/respond", verifyFirebaseToken, async (req: AuthRequest, res) => {
+  try {
+    const { surveyId, optionId } = req.body;
+    
+    if (!surveyId || !optionId) {
+      return res.status(400).json({ error: "Missing surveyId or optionId" });
+    }
+
+    const survey = await Survey.findById(surveyId);
+    if (!survey) {
+      return res.status(404).json({ error: "Survey not found" });
+    }
+
+    // Check if user already responded
+    const existingResponse = await SurveyResponse.findOne({
+      userId: req.user!.uid,
+      surveyId,
+    });
+
+    if (existingResponse) {
+      return res.status(400).json({ error: "You have already responded to this survey" });
+    }
+
+    // Increment option count
+    const option = survey.options.find(opt => opt.id === optionId);
+    if (!option) {
+      return res.status(404).json({ error: "Option not found" });
+    }
+
+    option.count += 1;
+    await survey.save();
+
+    // Save response
+    const response = new SurveyResponse({
+      userId: req.user!.uid,
+      surveyId,
+      optionId,
+    });
+    await response.save();
+
+    res.json({ ok: true, message: "Survey response recorded" });
+  } catch (error: unknown) {
+    console.error("Survey response save failed:", error);
+    res.status(500).json({ error: "Failed to save survey response" });
   }
 });
 

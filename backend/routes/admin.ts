@@ -3,6 +3,7 @@ import { verifyFirebaseToken, AuthRequest } from "../middleware/auth";
 import { getAdminDb, getAdminAuth } from "../services/firebaseAdmin";
 import { Feedback } from "../models/Feedback.model";
 import { ErrorLog } from "../models/ErrorLog.model";
+import { Survey, SurveyResponse } from "../models/Survey.model";
 
 const router = express.Router();
 
@@ -245,6 +246,76 @@ router.get("/errors", async (_req: AuthRequest, res) => {
   } catch (error: unknown) {
     console.error("Error logs fetching failed:", error);
     res.status(500).json({ error: "Failed to fetch error logs" });
+  }
+});
+
+// ── Survey Management ──────────────────────────────
+router.get("/surveys", async (_req: AuthRequest, res) => {
+  try {
+    const surveys = await Survey.find({})
+      .sort({ createdAt: -1 })
+      .select('-__v');
+    
+    res.json({ surveys });
+  } catch (error: unknown) {
+    console.error("Surveys fetching failed:", error);
+    res.status(500).json({ error: "Failed to fetch surveys" });
+  }
+});
+
+router.post("/surveys", async (req: AuthRequest, res) => {
+  try {
+    const { title, question, options } = req.body;
+    
+    if (!title || !question || !Array.isArray(options) || options.length === 0) {
+      return res.status(400).json({ error: "Missing required fields: title, question, options" });
+    }
+
+    const formattedOptions = options.map((text: string, index: number) => ({
+      id: `option-${index}`,
+      text,
+      count: 0,
+    }));
+
+    const survey = new Survey({
+      title,
+      question,
+      options: formattedOptions,
+      isActive: true,
+    });
+
+    await survey.save();
+    res.status(201).json({ survey });
+  } catch (error: unknown) {
+    console.error("Survey creation failed:", error);
+    res.status(500).json({ error: "Failed to create survey" });
+  }
+});
+
+router.get("/surveys/:surveyId/results", async (req: AuthRequest, res) => {
+  try {
+    const { surveyId } = req.params;
+    const survey = await Survey.findById(surveyId);
+    
+    if (!survey) {
+      return res.status(404).json({ error: "Survey not found" });
+    }
+
+    const responseCount = await SurveyResponse.countDocuments({ surveyId });
+    
+    res.json({ 
+      survey, 
+      totalResponses: responseCount,
+      responsePercentages: survey.options.map(opt => ({
+        id: opt.id,
+        text: opt.text,
+        count: opt.count,
+        percentage: responseCount > 0 ? ((opt.count / responseCount) * 100).toFixed(1) : 0,
+      })),
+    });
+  } catch (error: unknown) {
+    console.error("Survey results fetching failed:", error);
+    res.status(500).json({ error: "Failed to fetch survey results" });
   }
 });
 

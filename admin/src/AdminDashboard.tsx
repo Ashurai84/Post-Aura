@@ -69,14 +69,30 @@ interface ErrorItem {
   error: string;
 }
 
+interface SurveyOption {
+  id: string;
+  text: string;
+  count: number;
+}
+
+interface Survey {
+  _id: string;
+  title: string;
+  question: string;
+  options: SurveyOption[];
+  isActive: boolean;
+  createdAt: string;
+}
+
 export default function AdminDashboard() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [userData, setUserData] = useState<UserData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'users' | 'feedback' | 'errors'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'feedback' | 'errors' | 'surveys'>('users');
   const [feedback, setFeedback] = useState<FeedbackItem[]>([]);
   const [errorsData, setErrorsData] = useState<ErrorItem[]>([]);
+  const [surveys, setSurveys] = useState<Survey[]>([]);
   const [modalPost, setModalPost] = useState<{ text: string; user: string; topic: string; time: string } | null>(null);
   const [modalCopied, setModalCopied] = useState(false);
   const navigate = useNavigate();
@@ -126,6 +142,14 @@ export default function AdminDashboard() {
             setErrorsData(Array.isArray(eData) ? eData : (eData.errors ?? []));
           }
         } catch (e) { console.error('[PostAura] Failed to fetch errors', e); }
+
+        try {
+          const sRes = await fetch(`${getApiBase()}/api/admin/surveys`, { headers: { Authorization: `Bearer ${token}` } });
+          if (sRes.ok) {
+            const sData: { surveys?: Survey[] } = await sRes.json();
+            setSurveys(sData.surveys ?? []);
+          }
+        } catch (e) { console.error('[PostAura] Failed to fetch surveys', e); }
 
       } catch (err: unknown) {
         setError(err instanceof Error ? err.message : 'Something went wrong.');
@@ -275,13 +299,13 @@ export default function AdminDashboard() {
         <div className="flex items-center justify-between flex-wrap gap-3">
           <h2 className="text-xl font-bold">Users &amp; Content</h2>
           <div className="flex gap-1 border rounded-xl p-1 bg-muted/30">
-            {(['users', 'feedback', 'errors'] as const).map(tab => (
+            {(['users', 'feedback', 'errors', 'surveys'] as const).map(tab => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
                 className={`px-4 py-1.5 rounded-lg text-xs font-semibold uppercase tracking-wider transition-all ${activeTab === tab ? 'bg-card shadow text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
               >
-                {tab === 'users' ? 'Users' : tab === 'feedback' ? 'Feedback' : 'Error Logs'}
+                {tab === 'users' ? 'Users' : tab === 'feedback' ? 'Feedback' : tab === 'errors' ? 'Error Logs' : 'Surveys'}
               </button>
             ))}
           </div>
@@ -410,6 +434,46 @@ export default function AdminDashboard() {
                     </span>
                   </div>
                   <div className="text-red-400 mt-0.5 opacity-80 group-hover:opacity-100 break-words">{err.error}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {activeTab === 'surveys' && (
+          <div className="space-y-4">
+            {surveys.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-64 gap-2 text-muted-foreground">
+                <CheckCircle2 className="w-8 h-8" />
+                <p>No surveys created yet.</p>
+              </div>
+            ) : surveys.map((survey) => (
+              <div key={survey._id} className="border rounded-2xl p-5 space-y-4 hover:bg-muted/30 transition-colors">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <h3 className="font-bold text-lg">{survey.title}</h3>
+                    <p className="text-sm text-muted-foreground mt-1">{survey.question}</p>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Created: {new Date(survey.createdAt).toLocaleDateString()} | Status: {survey.isActive ? '🟢 Active' : '⭕ Inactive'}
+                    </p>
+                  </div>
+                </div>
+                <div className="space-y-3">
+                  {survey.options.map((option) => {
+                    const totalResponses = survey.options.reduce((sum, opt) => sum + opt.count, 0);
+                    const percentage = totalResponses > 0 ? (option.count / totalResponses) * 100 : 0;
+                    return (
+                      <div key={option.id} className="space-y-1">
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="font-medium">{option.text}</span>
+                          <span className="text-xs text-muted-foreground font-semibold">{option.count} responses ({percentage.toFixed(1)}%)</span>
+                        </div>
+                        <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
+                          <div className="h-full bg-primary transition-all" style={{ width: `${percentage}%` }} />
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             ))}
