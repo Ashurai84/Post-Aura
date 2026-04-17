@@ -12,42 +12,51 @@ if (!geminiApiKey) {
 const ai = geminiApiKey ? new GoogleGenAI({ apiKey: geminiApiKey }) : null;
 
 // Models in priority order — falls back if primary hits quota/unavailable
-const MODELS = ["gemini-2.5-flash", "gemini-2.0-flash"];
+const MODELS = ["gemini-2.0-flash", "gemini-1.5-flash"];
 
 function isRetryableError(err: unknown): boolean {
   if (err && typeof err === "object" && "status" in err) {
     const status = (err as any).status;
-    return status === 429 || status === 503;
+    return status === 429 || status === 503 || status === 404; // Include 404 for model not found fallback
   }
   const msg = err instanceof Error ? err.message : String(err);
-  return /429|503|RESOURCE_EXHAUSTED|UNAVAILABLE|quota|rate.?limit/i.test(msg);
+  return /429|503|404|RESOURCE_EXHAUSTED|UNAVAILABLE|NOT_FOUND|quota|rate.?limit/i.test(msg);
 }
 
 async function callWithRetryAndFallback(
   promptFn: (model: string) => Promise<string>,
   maxRetries = 2,
 ): Promise<string> {
+  let lastError: any = null;
+  
   for (const model of MODELS) {
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
-        console.log(`AI request: model=${model}, attempt=${attempt + 1}`);
-        return await promptFn(model);
+        console.log(`[AI] Request: model=${model}, attempt=${attempt + 1}`);
+        const result = await promptFn(model);
+        if (result) return result;
+        throw new Error("Empty response from AI");
       } catch (err) {
+        lastError = err;
+        console.error(`[AI] Error on ${model} (attempt ${attempt + 1}):`, err instanceof Error ? err.message : err);
+
         if (isRetryableError(err) && attempt < maxRetries) {
           const delay = Math.pow(2, attempt) * 1000 + Math.random() * 500;
-          console.warn(`Retryable error on ${model} (attempt ${attempt + 1}), waiting ${Math.round(delay)}ms...`);
+          console.warn(`[AI] Retrying ${model} in ${Math.round(delay)}ms...`);
           await new Promise((r) => setTimeout(r, delay));
           continue;
         }
-        if (isRetryableError(err)) {
-          console.warn(`Model ${model} exhausted retries, trying next model...`);
-          break; // try next model
-        }
-        throw err; // non-retryable error, bail out
+        
+        // If it's not retryable on THIS model, or we've run out of retries,
+        // break to try the NEXT model in the list.
+        console.warn(`[AI] Model ${model} failed, trying next available model...`);
+        break; 
       }
     }
   }
-  throw new Error("All Gemini models failed after retries. Please try again later.");
+  
+  console.error("[AI] All models failed. Last error:", lastError);
+  throw new Error(lastError?.message || "All Gemini models failed. Please try again later.");
 }
 
 

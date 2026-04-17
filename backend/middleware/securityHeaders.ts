@@ -34,6 +34,10 @@ export function securityHeaders(req: Request, res: Response, next: NextFunction)
     'geolocation=(), microphone=(), camera=(), payment=()'
   );
   
+  // ✅ Cross-Origin-Opener-Policy - allow popups to communicate back to the opener
+  // This helps fix errors where Firebase Auth popups are blocked by stricter policies
+  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
+  
   // ✅ HSTS - Force HTTPS in production
   if (process.env.NODE_ENV === 'production') {
     res.setHeader(
