@@ -1,26 +1,64 @@
-import { GoogleGenAI } from "@google/genai";
+// ═══════════════════════════════════════════════════════════════════════════
+// 🚀 AI Service: Groq (LLaMA Models)
+// ═══════════════════════════════════════════════════════════════════════════
+// SWITCHED TO: Groq API (llama-3.3-70b-versatile) - Free, fast, unlimited
+// REASON: Google Gemini quota exceeded - Groq provides unlimited access
+// 
+// TO REVERT TO GEMINI: See commented code at bottom of file
+// ═══════════════════════════════════════════════════════════════════════════
+
 import dotenv from "dotenv";
 dotenv.config();
 
-const geminiApiKey = process.env.GEMINI_API_KEY;
+// ── Groq Configuration ────────────────────────────────────────────────────
+const GROQ_API_KEY = process.env.GROQ_API_KEY;
+const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
 const pollinationsApiKey = process.env.POLLINATIONS_API_KEY;
 
-if (!geminiApiKey) {
-  console.warn("GEMINI_API_KEY is not defined in backend/.env");
+if (!GROQ_API_KEY) {
+  console.warn("⚠️  GROQ_API_KEY is not defined in backend/.env");
+  console.warn("   Post generation will fail. Add: GROQ_API_KEY=gsk_...");
 }
 
-const ai = geminiApiKey ? new GoogleGenAI({ apiKey: geminiApiKey }) : null;
-
 // Models in priority order — falls back if primary hits quota/unavailable
-const MODELS = ["gemini-2.0-flash", "gemini-1.5-flash"];
+const MODELS = [
+  "llama-3.3-70b-versatile",  // ⭐ Best quality (280 T/sec)
+  "llama-3.1-8b-instant",     // Fast alternative (560 T/sec)
+];
 
 function isRetryableError(err: unknown): boolean {
   if (err && typeof err === "object" && "status" in err) {
     const status = (err as any).status;
-    return status === 429 || status === 503 || status === 404; // Include 404 for model not found fallback
+    return status === 429 || status === 503; // Rate limit or service unavailable
   }
   const msg = err instanceof Error ? err.message : String(err);
-  return /429|503|404|RESOURCE_EXHAUSTED|UNAVAILABLE|NOT_FOUND|quota|rate.?limit/i.test(msg);
+  return /429|503|RATE_LIMIT|SERVICE_UNAVAILABLE|quota|rate.?limit/i.test(msg);
+}
+
+async function callGroqAPI(model: string, messages: Array<{ role: string; content: string }>): Promise<string> {
+  const response = await fetch(GROQ_API_URL, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${GROQ_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model,
+      messages,
+      temperature: 0.8,
+      max_tokens: 1500,
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    const err: any = new Error(error.error?.message || "Groq API error");
+    err.status = response.status;
+    throw err;
+  }
+
+  const data = await response.json();
+  return data.choices?.[0]?.message?.content || "";
 }
 
 async function callWithRetryAndFallback(
@@ -32,31 +70,31 @@ async function callWithRetryAndFallback(
   for (const model of MODELS) {
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
-        console.log(`[AI] Request: model=${model}, attempt=${attempt + 1}`);
+        console.log(`[Groq] Request: model=${model}, attempt=${attempt + 1}`);
         const result = await promptFn(model);
         if (result) return result;
-        throw new Error("Empty response from AI");
+        throw new Error("Empty response from Groq");
       } catch (err) {
         lastError = err;
-        console.error(`[AI] Error on ${model} (attempt ${attempt + 1}):`, err instanceof Error ? err.message : err);
+        console.error(`[Groq] Error on ${model} (attempt ${attempt + 1}):`, err instanceof Error ? err.message : err);
 
         if (isRetryableError(err) && attempt < maxRetries) {
           const delay = Math.pow(2, attempt) * 1000 + Math.random() * 500;
-          console.warn(`[AI] Retrying ${model} in ${Math.round(delay)}ms...`);
+          console.warn(`[Groq] Retrying ${model} in ${Math.round(delay)}ms...`);
           await new Promise((r) => setTimeout(r, delay));
           continue;
         }
         
         // If it's not retryable on THIS model, or we've run out of retries,
         // break to try the NEXT model in the list.
-        console.warn(`[AI] Model ${model} failed, trying next available model...`);
+        console.warn(`[Groq] Model ${model} failed, trying next available model...`);
         break; 
       }
     }
   }
   
-  console.error("[AI] All models failed. Last error:", lastError);
-  throw new Error(lastError?.message || "All Gemini models failed. Please try again later.");
+  console.error("[Groq] All models failed. Last error:", lastError);
+  throw new Error(lastError?.message || "All Groq models failed. Please try again later.");
 }
 
 
@@ -68,8 +106,8 @@ export async function synthesizePost(
   voiceProfile?: any,
   hashtagCount = 5,
 ): Promise<string> {
-  if (!ai) {
-    throw new Error("AI service is not configured. GEMINI_API_KEY is missing.");
+  if (!GROQ_API_KEY) {
+    throw new Error("AI service is not configured. GROQ_API_KEY is missing.");
   }
 
   // Build voice instructions from profile
@@ -77,7 +115,6 @@ export async function synthesizePost(
   if (voiceProfile) {
     const parts: string[] = [];
 
-    // Direct corrections from 👎 feedback (strongest signals)
     if (voiceProfile.prefersCasual) {
       parts.push("IMPORTANT: Write CASUALLY. Sound like a college student sharing with friends, not a corporate exec. Use simple words and short sentences.");
     }
@@ -88,7 +125,6 @@ export async function synthesizePost(
       parts.push("IMPORTANT: Make the opinion LOUD and PROVOCATIVE. The reader should feel the author's conviction. Don't hedge or soften the stance.");
     }
 
-    // Automatic profile (kicks in after 2+ posts)
     if (voiceProfile.postsAnalyzed >= 2) {
       if (voiceProfile.avgSentenceLength === "short") {
         parts.push("Use SHORT, punchy sentences (under 10 words on average). Be direct.");
@@ -109,76 +145,46 @@ export async function synthesizePost(
     }
 
     if (parts.length > 0) {
-      const postsInfo = voiceProfile.postsAnalyzed ? ` from ${voiceProfile.postsAnalyzed} posts + direct feedback` : " from direct feedback";
-      voiceInstructions = `\n    VOICE PROFILE (learned${postsInfo} — STRICTLY match this style):\n    ${parts.join("\n    ")}`;
+      const postsInfo = voiceProfile.postsAnalyzed ? ` from ${voiceProfile.postsAnalyzed} posts` : " from profile analysis";
+      voiceInstructions = `\n    VOICE PROFILE (learned${postsInfo}):\n    ${parts.join("\n    ")}`;
     }
   }
 
-  const prompt = `
-    You are an expert LinkedIn copywriter. Your goal is to write an authentic, human-sounding LinkedIn post that centers on the author's PERSONAL TAKEAWAY — not a generic summary of the topic.
+  const systemPrompt = `You are an expert LinkedIn copywriter. Write authentic, human-sounding posts centered on the author's PERSONAL TAKEAWAY.`;
 
-    WHAT HAPPENED: ${topic}
-    THE AUTHOR'S MAIN TAKEAWAY / OPINION: ${takeaway}
-    Target Audience: ${audience}
-    Desired Tone: ${tone}
-    ${voiceInstructions}
+  const userPrompt = `
+Create a LinkedIn post with these details:
+- What happened: ${topic}
+- Author's opinion: ${takeaway}
+- Target audience: ${audience}
+- Tone: ${tone}
+${voiceInstructions}
 
-    FORMATTING RULES (CRITICAL — follow these EXACTLY):
-    1. Use **bold text** (markdown bold with double asterisks) for:
-       - The opening hook line (MUST be bold)
-       - Key phrases or insights throughout the post (2-3 bold phrases total)
-       - The final call to action or closing statement
-    2. Use emojis strategically:
-       - Start major sections with a relevant emoji (🔥, 💡, 🚀, ⚡, 🎯, 💪, 🧠, etc.)
-       - Use 3-5 emojis total throughout the post — NOT more
-       - Emojis should feel natural and expressive, not decorative
-       - The hook can start with an emoji
-    3. Use generous line breaks between paragraphs — single sentences as their own lines
-    4. Keep the post between 150-250 words — long enough to have substance, short enough to not lose attention
+FORMATTING RULES:
+1. Use **bold** for hook, key phrases, and CTA
+2. Strategic emojis (3-5 total, not decorative)
+3. Generous line breaks between paragraphs
+4. 150-250 words total
+5. Premium feel - like from a 50K+ follower account
 
-    CONTENT RULES:
-    1. The post MUST be built around the TAKEAWAY. The takeaway is the author's personal opinion/belief — it should be the CORE MESSAGE of the post. The topic/event is just context.
-    2. DO NOT write a generic summary of the topic. The takeaway makes this post UNIQUE.
-    3. DO NOT use robotic fluff words like "delve", "tapestry", "game-changer", "unlock", "supercharge", "navigate", "landscape", "leverage", "foster".
-    4. Structure: **Bold provocative Hook** → Personal context (1-2 lines) → 💡 The insight/takeaway expanded → 🎯 Call to Action or question
-    5. Keep sentences SHORT and punchy.
-    6. Sound like a real person who was THERE and has a STRONG OPINION, not an AI summarizing a topic.
-    7. Write in first person. The author experienced this.
-    8. The hook should be PROVOCATIVE — make someone stop scrolling. Lead with the opinion, not the event.
-     9. ALWAYS include 4-7 highly relevant hashtags at the end of the post.
-       - Make them specific to topic + audience (avoid generic spam tags)
-       - Keep hashtags on the final line(s), clean and readable
-     10. The overall feel should be PREMIUM — like a post from someone with 50K followers, not a beginner. Confident, bold, expressive.
+CONTENT RULES:
+- Post MUST center on the takeaway (author's opinion/belief)
+- NO generic summaries - make it unique
+- NO fluff: "delve", "tapestry", "game-changer", "unlock", "supercharge"
+- Structure: Hook → Context → Insight → CTA
+- Short, punchy sentences
+- First-person voice
+- Hook should be provocative
 
-    Also generate exactly ${hashtagCount} hashtags.
-    Mix three types equally:
-    - Niche: specific to the post topic
-    - Audience: matching who will read this (founders, students, developers, CEOs etc)
-    - Trending: currently active on LinkedIn
-
-    Return hashtags as a separate JSON field:
-    hashtags: string[]
-
-    Each hashtag must:
-    - Start with #
-    - Be one word or camelCase
-    - Be relevant, not generic
-    - NEVER include: #LinkedIn #Post #Content
-
-    Example for a tech founder post:
-    ['#BuildInPublic', '#FounderLife', '#StartupIndia', '#TechFounders', '#IndianStartups']
-  `;
+END WITH: Exactly ${hashtagCount} highly relevant hashtags (one per line, start with #)
+`;
 
   return callWithRetryAndFallback(async (model) => {
-    const response = await ai.models.generateContent({
-      model,
-      contents: prompt,
-      config: {
-        tools: [{ googleSearch: {} }],
-        temperature: 0.8,
-      },
-    });
-    return response.text || "";
+    const response = await callGroqAPI(model, [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userPrompt },
+    ]);
+    return response;
   });
 }
 
@@ -188,41 +194,38 @@ export async function iteratePost(
   existingHashtags: string[] = [],
   hashtagCount = 5,
 ): Promise<string> {
-  if (!ai) {
-    throw new Error("AI service is not configured. GEMINI_API_KEY is missing.");
+  if (!GROQ_API_KEY) {
+    throw new Error("AI service is not configured. GROQ_API_KEY is missing.");
   }
 
-  const prompt = `
-    You are an expert LinkedIn copywriter editing an existing post.
-    
-    Current Post:
-    """
-    ${currentContent}
-    """
-    
-    Instruction for iteration: ${instruction}
-    Current locked hashtags:
-    ${existingHashtags.join(" ")}
-    
-    CRITICAL RULES:
-    1. Apply the instruction to the current post.
-    2. DO NOT hallucinate new facts or change the original core story/message.
-    3. DO NOT use robotic fluff words like "delve", "tapestry", "game-changer", "unlock", "supercharge".
-    4. Maintain the LinkedIn formatting (Hook, Body, Conclusion, CTA) unless the instruction implies otherwise.
-    5. Preserve the same hashtags from Current locked hashtags unless the topic changes dramatically.
-    6. Keep exactly ${hashtagCount} hashtags at the end.
-    7. Return ONLY the updated post content, without any meta-commentary.
-  `;
+  const systemPrompt = `You are an expert LinkedIn copywriter editing an existing post.`;
+
+  const userPrompt = `
+Current Post:
+"""
+${currentContent}
+"""
+
+Instruction for iteration: ${instruction}
+Current locked hashtags:
+${existingHashtags.join(" ")}
+
+CRITICAL RULES:
+1. Apply the instruction to the current post.
+2. DO NOT hallucinate new facts or change the original core story/message.
+3. DO NOT use robotic fluff words like "delve", "tapestry", "game-changer", "unlock", "supercharge".
+4. Maintain the LinkedIn formatting (Hook, Body, Conclusion, CTA) unless the instruction implies otherwise.
+5. Preserve the same hashtags from Current locked hashtags unless the topic changes dramatically.
+6. Keep exactly ${hashtagCount} hashtags at the end.
+7. Return ONLY the updated post content, without any meta-commentary.
+`;
 
   return callWithRetryAndFallback(async (model) => {
-    const response = await ai.models.generateContent({
-      model,
-      contents: prompt,
-      config: {
-        temperature: 0.7,
-      },
-    });
-    return response.text || "";
+    const response = await callGroqAPI(model, [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userPrompt },
+    ]);
+    return response;
   });
 }
 
