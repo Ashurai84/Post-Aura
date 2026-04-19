@@ -151,25 +151,34 @@ router.get("/users/:userId/posts", async (req: AuthRequest, res) => {
 router.get("/user-data", async (_req: AuthRequest, res) => {
   try {
     const db = getAdminDb();
+    const auth = getAdminAuth();
     
-    // Get TOTAL user count
-    const totalCountSnap = await db.collection("users").count().get();
-    const totalUserCount = totalCountSnap.data().count;
-    
+    // ✅ Use Firebase Auth as the authoritative source (has ALL users)
+    const authResult = await auth.listUsers(1000);
+    const totalUserCount = authResult.users.length;
+
+    // Fetch Firestore user docs to enrich Auth users
     const usersSnap = await db.collection("users").get();
-    
-    // Sort and limit users first
-    const sortedUserDocs = usersSnap.docs.slice().sort((a: any, b: any) => {
-      const timeA = a.data().createdAt?.toMillis?.() || a.data().createdAt?._seconds || 0;
-      const timeB = b.data().createdAt?.toMillis?.() || b.data().createdAt?._seconds || 0;
-      return timeB - timeA;
-    }).slice(0, 50); // Display only first 50
+    const firestoreMap = new Map<string, any>();
+    usersSnap.docs.forEach((doc: any) => {
+      firestoreMap.set(doc.id, doc.data());
+    });
+
+    // Sort by creation time (newest first), limit to 50
+    const sortedAuthUsers = authResult.users
+      .slice()
+      .sort((a, b) => {
+        const timeA = new Date(a.metadata.creationTime).getTime();
+        const timeB = new Date(b.metadata.creationTime).getTime();
+        return timeB - timeA;
+      })
+      .slice(0, 50);
 
     const usersWithPosts = await Promise.all(
-      sortedUserDocs.map(async (userDoc: any) => {
-        const userData = userDoc.data();
+      sortedAuthUsers.map(async (authUser) => {
+        const firestoreData = firestoreMap.get(authUser.uid) || {};
         const postsSnap = await db.collection("posts")
-          .where("userId", "==", userDoc.id)
+          .where("userId", "==", authUser.uid)
           .get();
 
         const posts = postsSnap.docs.map((doc: any) => {
@@ -188,18 +197,18 @@ router.get("/user-data", async (_req: AuthRequest, res) => {
         }).slice(0, 10);
 
         return {
-          uid: userDoc.id,
-          email: userData.email || "",
-          displayName: userData.displayName || "Unknown",
-          isPro: !!userData.isPro,
-          createdAt: userData.createdAt,
+          uid: authUser.uid,
+          email: authUser.email || firestoreData.email || "",
+          displayName: authUser.displayName || firestoreData.displayName || authUser.email?.split("@")[0] || "Unknown",
+          isPro: !!firestoreData.isPro,
+          createdAt: firestoreData.createdAt || new Date(authUser.metadata.creationTime),
           totalPosts: posts.length,
           recentPosts: posts,
         };
       })
     );
 
-    // ✅ Return ACTUAL total count, not just displayed count
+    // ✅ Return ACTUAL total count from Firebase Auth
     res.json({ totalUsers: totalUserCount, users: usersWithPosts });
   } catch (error: unknown) {
     console.error("User data fetching failed:", error);
@@ -247,11 +256,11 @@ router.get("/feedback", async (_req: AuthRequest, res) => {
       .limit(100);
 
     // Fetch post quality feedback from Firestore analytics
+    // Note: no orderBy to avoid composite index requirement — sorted in code below
     const firestoreFeedback: any[] = [];
     const analyticsSnap = await db
       .collection("analytics")
       .where("type", "==", "post-feedback")
-      .orderBy("timestamp", "desc")
       .limit(100)
       .get();
     
