@@ -129,6 +129,11 @@ router.get("/users/:userId/posts", async (req: AuthRequest, res) => {
 router.get("/user-data", async (_req: AuthRequest, res) => {
   try {
     const db = getAdminDb();
+    
+    // Get TOTAL user count
+    const totalCountSnap = await db.collection("users").count().get();
+    const totalUserCount = totalCountSnap.data().count;
+    
     const usersSnap = await db.collection("users").get();
     
     // Sort and limit users first
@@ -136,7 +141,7 @@ router.get("/user-data", async (_req: AuthRequest, res) => {
       const timeA = a.data().createdAt?.toMillis?.() || a.data().createdAt?._seconds || 0;
       const timeB = b.data().createdAt?.toMillis?.() || b.data().createdAt?._seconds || 0;
       return timeB - timeA;
-    }).slice(0, 50);
+    }).slice(0, 50); // Display only first 50
 
     const usersWithPosts = await Promise.all(
       sortedUserDocs.map(async (userDoc: any) => {
@@ -172,7 +177,8 @@ router.get("/user-data", async (_req: AuthRequest, res) => {
       })
     );
 
-    res.json({ totalUsers: usersWithPosts.length, users: usersWithPosts });
+    // ✅ Return ACTUAL total count, not just displayed count
+    res.json({ totalUsers: totalUserCount, users: usersWithPosts });
   } catch (error: unknown) {
     console.error("User data fetching failed:", error);
     res.status(500).json({ error: "Internal server error" });

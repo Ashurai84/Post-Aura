@@ -242,17 +242,11 @@ export default function AdminDashboard() {
     }
   };
 
-  // ✅ REAL-TIME UPDATES: Fetch data on mount and set up polling
+  // ✅ OPTIMIZED: Fetch data on mount only, manual refresh button
   useEffect(() => {
-    fetchData(true); // Initial fetch
-
-    // Set up polling - refresh every 15 seconds (avoiding rate limits)
-    const pollInterval = setInterval(() => {
-      fetchData(false);
-    }, 15000); // 15 second refresh interval to avoid rate limiting
-
-    // Cleanup interval on unmount
-    return () => clearInterval(pollInterval);
+    fetchData(true); // Initial fetch only - don't auto-refresh!
+    // Removed: polling interval (was causing 32 requests/min)
+    // Users can now click "Refresh" button manually for updates
   }, [navigate]);
 
   const handleDeleteUser = async (userId: string) => {
@@ -318,7 +312,7 @@ export default function AdminDashboard() {
             <ArrowLeft className="h-3 w-3" /> Back to App
           </button>
           <h1 className="text-3xl font-bold tracking-tight">PostAura Command Center</h1>
-          <p className="text-muted-foreground">Real-time growth and intent analytics — Refreshing every 5 seconds</p>
+          <p className="text-muted-foreground">Real-time growth and intent analytics — Click refresh for updates</p>
         </div>
         <div className="flex items-center gap-3">
           <div className="bg-background border rounded-2xl px-4 py-2 flex items-center gap-3 shadow-sm">
