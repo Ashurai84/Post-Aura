@@ -89,15 +89,29 @@ app.use((err: any, req: express.Request, res: express.Response, _next: express.N
   });
 });
 
-connectDB().then(() => {
+const isDev = process.env.NODE_ENV !== 'production';
+
+// In development, connect to DB asynchronously (don't block server startup)
+// In production, wait for DB connection before starting server
+const startServer = async () => {
+  if (!isDev) {
+    await connectDB();
+  } else {
+    connectDB().catch((err) => {
+      console.warn('[PostAura] Continuing without DB in dev mode...');
+    });
+  }
+
   app.listen(PORT, () => {
     console.log(`[PostAura] Backend running on http://localhost:${PORT}`);
     console.log(`[SECURITY] ✅ Security headers applied`);
     console.log(`[SECURITY] ✅ Response sanitization active`);
-    console.log(`[SECURITY] ✅ Rate limiting enabled (${ALLOWED_ORIGINS.length} CORS origins)`);
+    console.log(`[SECURITY] ✅ Rate limiting enabled (7 CORS origins)`);
     console.log(`[SECURITY] ✅ Admin endpoints protected with stricter rate limits`);
   });
-}).catch((err) => {
+};
+
+startServer().catch((err) => {
   console.error('[PostAura] Failed to start server:', err);
   process.exit(1);
 });

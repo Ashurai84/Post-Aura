@@ -13,9 +13,18 @@ const router = express.Router();
 console.log("[PostAura] Admin server router initialized");
 
 function isGeminiQuotaError(err: unknown): boolean {
+  if (!err) return false;
+  // Check for HTTP-style status code (SDK may expose this)
+  if (typeof err === "object" && err !== null && "status" in err) {
+    if ((err as any).status === 429) return true;
+  }
+  // Check for 'code' property (some SDK errors use this)
+  if (typeof err === "object" && err !== null && "code" in err) {
+    if ((err as any).code === 429) return true;
+  }
   const msg =
     err instanceof Error
-      ? err.message
+      ? err.message + (err.stack || "")
       : typeof err === "object" && err !== null
         ? JSON.stringify(err)
         : String(err);
@@ -240,7 +249,7 @@ router.post("/ai/synthesize", verifyFirebaseToken, checkUsage, async (req: AuthR
     const { topic, takeaway, audience, tone, hashtagCount } = req.body;
     const targetHashtagCount = normalizeHashtagCount(hashtagCount);
 
-    // Read voice profile from user doc
+    // Read voice profile from user doc (with error handling for local dev)
     let voiceProfile = null;
     try {
       const userDoc = await getAdminDb().collection("users").doc(req.user!.uid).get();
@@ -248,22 +257,31 @@ router.post("/ai/synthesize", verifyFirebaseToken, checkUsage, async (req: AuthR
         voiceProfile = userDoc.data()?.voiceProfile || null;
       }
     } catch (e) {
-      console.warn("Could not read voice profile:", e);
+      console.warn("[DEV] Could not read voice profile from Firebase:", (e as any)?.message);
+      // Continue without voice profile - this is OK for local testing
     }
 
     const rawResult = await aiService.synthesizePost(topic, takeaway || "", audience, tone, voiceProfile, targetHashtagCount);
     const extractedHashtags = extractHashtags(rawResult);
     const safeHashtags = ensureMandatoryHashtags(extractedHashtags, topic || "", audience || "", targetHashtagCount);
     const result = appendHashtagLineIfMissing(rawResult, safeHashtags);
-    const bestPostingTime = await recommendBestPostingTimeForUser(
-      req.user!.uid,
-      audience || "",
-      topic || "",
-      tone || "",
-    );
+    
+    // Get best posting time (with error handling)
+    let bestPostingTime = null;
+    try {
+      bestPostingTime = await recommendBestPostingTimeForUser(
+        req.user!.uid,
+        audience || "",
+        topic || "",
+        tone || "",
+      );
+    } catch (e) {
+      console.warn("[DEV] Could not recommend posting time:", (e as any)?.message);
+      // Continue without posting time recommendation
+    }
 
     // Update voice profile in background (don't block response)
-    updateVoiceProfile(req.user!.uid, result).catch(e => console.warn("Voice profile update failed:", e));
+    updateVoiceProfile(req.user!.uid, result).catch(e => console.warn("[DEV] Voice profile update failed:", e));
 
     // Build visible voice tags for the frontend
     const voiceTags: string[] = [];
@@ -278,7 +296,7 @@ router.post("/ai/synthesize", verifyFirebaseToken, checkUsage, async (req: AuthR
       if (voiceProfile.perspective === "first-person") voiceTags.push("Personal");
     }
 
-    // Log generation analytics
+    // Log generation analytics (with error handling)
     try {
       await getAdminDb().collection("analytics").add({
         type: "post-generated",
@@ -286,7 +304,7 @@ router.post("/ai/synthesize", verifyFirebaseToken, checkUsage, async (req: AuthR
         timestamp: FieldValue.serverTimestamp(),
       });
     } catch (e) {
-      console.warn("Analytics log failed:", e);
+      console.warn("[DEV] Analytics log failed:", (e as any)?.message);
     }
 
     res.json({ 
@@ -344,7 +362,7 @@ router.post("/ai/generate-image", verifyFirebaseToken, checkUsage, async (req: A
     const { prompt, size } = req.body;
     const url = await aiService.generateImage(prompt, size);
     
-    // Log image generation analytics
+    // Log image generation analytics (with error handling)
     try {
       await getAdminDb().collection("analytics").add({
         type: "image-generated",
@@ -352,7 +370,7 @@ router.post("/ai/generate-image", verifyFirebaseToken, checkUsage, async (req: A
         timestamp: FieldValue.serverTimestamp(),
       });
     } catch (e) {
-      console.warn("Analytics log failed:", e);
+      console.warn("[DEV] Analytics log failed:", (e as any)?.message);
     }
 
     res.json({ url });
