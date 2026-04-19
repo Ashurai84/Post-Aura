@@ -16,10 +16,13 @@ router.use(verifyFirebaseToken, requireAdminEmail);
 router.get("/stats", async (_req: AuthRequest, res) => {
   try {
     const db = getAdminDb();
+    const auth = getAdminAuth();
 
-    const usersSnap = await db.collection("users").count().get();
-    const totalUsers = usersSnap.data().count;
+    // ✅ Get TOTAL users from Firebase Auth (authoritative)
+    const authUsers = await auth.listUsers(1000);
+    const totalUsers = authUsers.users.length;
 
+    // Get other stats from Firestore
     const activeUsersSnap = await db.collection("users").where("postsAnalyzed", ">", 0).count().get();
     const activeUsers = activeUsersSnap.data().count;
 
@@ -64,26 +67,45 @@ router.get("/stats", async (_req: AuthRequest, res) => {
 router.get("/users", async (_req: AuthRequest, res) => {
   try {
     const db = getAdminDb();
-    const usersSnap = await db.collection("users").get();
+    const auth = getAdminAuth();
 
-    const users = usersSnap.docs.map((doc: any) => {
-      const data = doc.data();
+    // ✅ Fetch from Firebase Auth (authoritative source - has ALL users)
+    const authUsers = await auth.listUsers(1000); // Get up to 1000 users
+    
+    // ✅ Fetch Firestore data to enrich Auth users
+    const firestoreUsersSnap = await db.collection("users").get();
+    const firestoreUsersMap = new Map();
+    
+    firestoreUsersSnap.docs.forEach((doc: any) => {
+      firestoreUsersMap.set(doc.id, doc.data());
+    });
+
+    // ✅ Merge Auth users with Firestore data
+    const users = authUsers.users.map((authUser) => {
+      const firestoreData = firestoreUsersMap.get(authUser.uid) || {};
       return {
-        uid: doc.id,
-        email: data.email || "",
-        displayName: data.displayName || "Unknown",
-        isPro: !!data.isPro,
-        planType: data.planType || "free",
-        createdAt: data.createdAt,
-        postsAnalyzed: data.voiceProfile?.postsAnalyzed || 0,
+        uid: authUser.uid,
+        email: authUser.email || "",
+        displayName: authUser.displayName || authUser.email?.split("@")[0] || "Unknown",
+        isPro: !!firestoreData.isPro,
+        planType: firestoreData.planType || "free",
+        createdAt: firestoreData.createdAt || new Date(authUser.metadata.creationTime),
+        postsAnalyzed: firestoreData.voiceProfile?.postsAnalyzed || 0,
+        authSource: !firestoreData.email ? "auth-only" : "synced", // Debug flag
       };
-    }).sort((a: any, b: any) => {
-      const timeA = a.createdAt?.toMillis?.() || a.createdAt?._seconds || 0;
-      const timeB = b.createdAt?.toMillis?.() || b.createdAt?._seconds || 0;
+    })
+    .sort((a: any, b: any) => {
+      const timeA = a.createdAt?.toMillis?.() || a.createdAt?.getTime?.() || 0;
+      const timeB = b.createdAt?.toMillis?.() || b.createdAt?.getTime?.() || 0;
       return timeB - timeA;
-    }).slice(0, 100);
+    })
+    .slice(0, 100);
 
-    res.json({ users });
+    res.json({ 
+      users,
+      totalFromAuth: authUsers.users.length,
+      totalInFirestore: firestoreUsersSnap.size,
+    });
   } catch (error: unknown) {
     console.error("Users fetching failed:", error);
     res.status(500).json({ error: "Internal server error" });
