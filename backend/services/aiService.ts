@@ -5,7 +5,7 @@
 // Paid key is loaded from GEMINI_PAID_KEY and kept last in the pool.
 // ═══════════════════════════════════════════════════════════════════════════
 
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenAI } from "@google/genai";
 import axios from "axios";
 import dotenv from "dotenv";
 dotenv.config();
@@ -17,7 +17,7 @@ const KEY_EXHAUSTION_WINDOW_MS = 23 * 60 * 60 * 1000;
 interface GeminiKeyEntry {
   key: string;
   isPaid: boolean;
-  client: GoogleGenerativeAI;
+  client: GoogleGenAI;
   exhaustedAt: number | null;
 }
 
@@ -34,7 +34,7 @@ const allKeys: GeminiKeyEntry[] = [
   ...freeKeyValues.map((key) => ({
     key,
     isPaid: false,
-    client: new GoogleGenerativeAI(key),
+    client: new GoogleGenAI({ apiKey: key }),
     exhaustedAt: null,
   })),
   ...(paidKeyValue
@@ -42,7 +42,7 @@ const allKeys: GeminiKeyEntry[] = [
         {
           key: paidKeyValue,
           isPaid: true,
-          client: new GoogleGenerativeAI(paidKeyValue),
+          client: new GoogleGenAI({ apiKey: paidKeyValue }),
           exhaustedAt: null,
         },
       ]
@@ -86,7 +86,7 @@ function countExhaustedFreeKeys(): number {
   }, 0);
 }
 
-function getNextClient(usedKeys: Set<number>): { client: GoogleGenerativeAI; keyIndex: number; isPaid: boolean } | null {
+function getNextClient(usedKeys: Set<number>): { client: GoogleGenAI; keyIndex: number; isPaid: boolean } | null {
   if (allKeys.length === 0) return null;
 
   const freeCount = freeKeys.length;
@@ -141,7 +141,7 @@ function isQuotaExhausted(err: unknown): boolean {
 }
 
 async function callWithRotationAndFallback(
-  promptFn: (ai: GoogleGenerativeAI, model: string) => Promise<string>,
+  promptFn: (ai: GoogleGenAI, model: string) => Promise<string>,
   maxRetries = 0, // No retries — just rotate to next model/key instantly
 ): Promise<string> {
   if (allKeys.length === 0) {
@@ -282,9 +282,15 @@ export async function synthesizePost(
   `;
 
   return callWithRotationAndFallback(async (ai, model) => {
-    const genModel = ai.getGenerativeModel({ model });
-    const response = await genModel.generateContent(prompt);
-    return response.response.text() || "";
+    const response = await ai.models.generateContent({
+      model,
+      contents: prompt,
+      config: {
+        tools: [{ googleSearch: {} }],
+        temperature: 0.8,
+      },
+    });
+    return response.text || "";
   });
 }
 
@@ -315,9 +321,14 @@ export async function iteratePost(
   `;
 
   return callWithRotationAndFallback(async (ai, model) => {
-    const genModel = ai.getGenerativeModel({ model });
-    const response = await genModel.generateContent(prompt);
-    return response.response.text() || "";
+    const response = await ai.models.generateContent({
+      model,
+      contents: prompt,
+      config: {
+        temperature: 0.7,
+      },
+    });
+    return response.text || "";
   });
 }
 
