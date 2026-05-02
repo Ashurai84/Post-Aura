@@ -1,73 +1,210 @@
 // ═══════════════════════════════════════════════════════════════════════════
-// 🚀 AI Service: Google Gemini
+// 🚀 AI Service: Google Gemini (Hybrid Free + Paid Rotation)
+// ═══════════════════════════════════════════════════════════════════════════
+// Free keys are loaded from GEMINI_API_KEY (comma-separated).
+// Paid key is loaded from GEMINI_PAID_KEY and kept last in the pool.
 // ═══════════════════════════════════════════════════════════════════════════
 
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
+import axios from "axios";
 import dotenv from "dotenv";
 dotenv.config();
 
-// ── Gemini Configuration ──────────────────────────────────────────────────
-const geminiApiKey = process.env.GEMINI_API_KEY;
+// ── Multi-Key Configuration ───────────────────────────────────────────────
 const pollinationsApiKey = process.env.POLLINATIONS_API_KEY;
+const KEY_EXHAUSTION_WINDOW_MS = 23 * 60 * 60 * 1000;
 
-if (!geminiApiKey) {
-  console.warn("⚠️  GEMINI_API_KEY is not defined in backend/.env");
+interface GeminiKeyEntry {
+  key: string;
+  isPaid: boolean;
+  client: GoogleGenerativeAI;
+  exhaustedAt: number | null;
 }
 
-const ai = geminiApiKey ? new GoogleGenAI({ apiKey: geminiApiKey }) : null;
+// Parse comma-separated free keys first, then append the paid key last.
+const rawFreeKeys = process.env.GEMINI_API_KEY || "";
+const freeKeyValues = rawFreeKeys
+  .split(",")
+  .map((k) => k.trim())
+  .filter((k) => k.length > 0);
 
-// Models in priority order — falls back if primary hits quota/unavailable
+const paidKeyValue = (process.env.GEMINI_PAID_KEY || "").trim();
+
+const allKeys: GeminiKeyEntry[] = [
+  ...freeKeyValues.map((key) => ({
+    key,
+    isPaid: false,
+    client: new GoogleGenerativeAI(key),
+    exhaustedAt: null,
+  })),
+  ...(paidKeyValue
+    ? [
+        {
+          key: paidKeyValue,
+          isPaid: true,
+          client: new GoogleGenerativeAI(paidKeyValue),
+          exhaustedAt: null,
+        },
+      ]
+    : []),
+];
+
+const freeKeys = allKeys.filter((entry) => !entry.isPaid);
+const paidKey = allKeys.find((entry) => entry.isPaid) || null;
+const keyExhaustedAt = new Map<number, number>();
+
+if (freeKeys.length === 0 && !paidKey) {
+  console.warn("⚠️  GEMINI_API_KEY and GEMINI_PAID_KEY are not defined in backend/.env");
+} else {
+  console.log(
+    `HYBRID KEY SYSTEM COMPLETE ✓ Free keys: ${freeKeys.length} loaded | Paid key: ${paidKey ? "loaded" : "not found"} | Model order: 1.5 → 2.0 → 2.5`,
+  );
+}
+
+// Round-robin index — rotates through keys on each request
+let currentKeyIndex = 0;
+
+function isKeyFresh(keyIndex: number): boolean {
+  const exhaustedAt = keyExhaustedAt.get(keyIndex) ?? allKeys[keyIndex]?.exhaustedAt ?? null;
+  if (exhaustedAt === null) return true;
+  return Date.now() - exhaustedAt >= KEY_EXHAUSTION_WINDOW_MS;
+}
+
+function markKeyExhausted(keyIndex: number): void {
+  const now = Date.now();
+  keyExhaustedAt.set(keyIndex, now);
+  if (allKeys[keyIndex]) {
+    allKeys[keyIndex].exhaustedAt = now;
+  }
+}
+
+function countExhaustedFreeKeys(): number {
+  return freeKeys.reduce((count, entry) => {
+    const keyIndex = allKeys.findIndex((candidate) => candidate.key === entry.key && !candidate.isPaid);
+    if (keyIndex === -1) return count;
+    return isKeyFresh(keyIndex) ? count : count + 1;
+  }, 0);
+}
+
+function getNextClient(usedKeys: Set<number>): { client: GoogleGenerativeAI; keyIndex: number; isPaid: boolean } | null {
+  if (allKeys.length === 0) return null;
+
+  const freeCount = freeKeys.length;
+  const exhaustedFreeCount = countExhaustedFreeKeys();
+
+  for (let offset = 0; offset < allKeys.length; offset += 1) {
+    const keyIndex = (currentKeyIndex + offset) % allKeys.length;
+    const entry = allKeys[keyIndex];
+
+    if (usedKeys.has(keyIndex)) continue;
+    if (entry.isPaid) continue;
+    if (!isKeyFresh(keyIndex)) continue;
+
+    currentKeyIndex = (keyIndex + 1) % allKeys.length;
+    return { client: entry.client, keyIndex, isPaid: entry.isPaid };
+  }
+
+  if (!paidKey) return null;
+
+  if (freeCount > 0 && exhaustedFreeCount < freeCount) {
+    throw new Error("Free tier exhausted on this key, rotating to next free key");
+  }
+
+  const paidKeyIndex = allKeys.findIndex((entry) => entry.isPaid);
+  if (paidKeyIndex === -1 || usedKeys.has(paidKeyIndex) || !isKeyFresh(paidKeyIndex)) {
+    return null;
+  }
+
+  currentKeyIndex = (paidKeyIndex + 1) % allKeys.length;
+  return { client: paidKey.client, keyIndex: paidKeyIndex, isPaid: true };
+}
+
+// Models in priority order — optimized for free-tier limits
 const MODELS = [
-  "gemini-2.5-flash",       // ⭐ Primary — has free-tier quota (5 RPM, 20 RPD)
-  "gemini-2.0-flash-lite",  // Lightweight fallback
+  "gemini-1.5-flash",
+  "gemini-2.0-flash",
+  "gemini-2.5-flash",
 ];
 
 function isRetryableError(err: unknown): boolean {
   if (err && typeof err === "object" && "status" in err) {
     const status = (err as any).status;
-    return status === 429 || status === 503; // Rate limit or service unavailable
+    return status === 429 || status === 503;
   }
   const msg = err instanceof Error ? err.message : String(err);
   return /429|503|RESOURCE_EXHAUSTED|UNAVAILABLE|quota|rate.?limit/i.test(msg);
 }
 
-async function callWithRetryAndFallback(
-  promptFn: (model: string) => Promise<string>,
-  maxRetries = 2,
-): Promise<string> {
-  let lastError: any = null;
-  
-  for (const model of MODELS) {
-    for (let attempt = 0; attempt <= maxRetries; attempt++) {
-      try {
-        console.log(`[Gemini] Request: model=${model}, attempt=${attempt + 1}`);
-        const result = await promptFn(model);
-        if (result) return result;
-        throw new Error("Empty response from Gemini");
-      } catch (err) {
-        lastError = err;
-        console.error(`[Gemini] Error on ${model} (attempt ${attempt + 1}):`, err instanceof Error ? err.message : err);
+function isQuotaExhausted(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return /429|RESOURCE_EXHAUSTED|quota/i.test(msg);
+}
 
-        if (isRetryableError(err) && attempt < maxRetries) {
-          const delay = Math.pow(2, attempt) * 1000 + Math.random() * 500;
-          console.warn(`[Gemini] Retrying ${model} in ${Math.round(delay)}ms...`);
-          await new Promise((r) => setTimeout(r, delay));
-          continue;
+async function callWithRotationAndFallback(
+  promptFn: (ai: GoogleGenerativeAI, model: string) => Promise<string>,
+  maxRetries = 0, // No retries — just rotate to next model/key instantly
+): Promise<string> {
+  if (allKeys.length === 0) {
+    throw new Error("AI service is not configured. GEMINI_API_KEY / GEMINI_PAID_KEY is missing.");
+  }
+
+  let lastError: any = null;
+  const keysAttempted = new Set<number>();
+
+  // Try each API key once per call, preferring fresh free keys before the paid key.
+  while (keysAttempted.size < allKeys.length) {
+    const entry = getNextClient(keysAttempted);
+
+    if (!entry) break;
+
+    if (keysAttempted.has(entry.keyIndex)) continue;
+    keysAttempted.add(entry.keyIndex);
+
+    // For each key, try each model
+    let paidKeyWarningLogged = false;
+    for (const model of MODELS) {
+      for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        try {
+          if (entry.isPaid) {
+            if (!paidKeyWarningLogged) {
+              console.warn("[Gemini] ⚠️ Using PAID key — free tier exhausted");
+              paidKeyWarningLogged = true;
+            }
+            console.log(`[Gemini] ⚠️ PAID key | ${model}`);
+          } else {
+            const freeKeyIndex = freeKeys.findIndex((candidate) => candidate.key === allKeys[entry.keyIndex].key && !candidate.isPaid) + 1;
+            console.log(`[Gemini] FREE Key ${freeKeyIndex}/${freeKeys.length} | ${model}`);
+          }
+          const result = await promptFn(entry.client, model);
+          if (result) return result;
+          throw new Error("Empty response from Gemini");
+        } catch (err) {
+          lastError = err;
+          const errMsg = err instanceof Error ? err.message : String(err);
+          console.error(`[Gemini] Key ${entry.keyIndex + 1} | ${model}:`, errMsg.substring(0, 100));
+
+          // If quota exhausted on this key, skip to next KEY immediately
+          if (isQuotaExhausted(err)) {
+            markKeyExhausted(entry.keyIndex);
+            console.warn(`[Gemini] Key ${entry.keyIndex + 1} exhausted, moving to next...`);
+            break;
+          }
+
+          // Non-retryable or last attempt → try next model
+          break;
         }
-        
-        // If it's not retryable on THIS model, or we've run out of retries,
-        // break to try the NEXT model in the list.
-        console.warn(`[Gemini] Model ${model} failed, trying next available model...`);
-        break; 
       }
+
+      // If quota exhausted, don't try more models on this key
+      if (lastError && isQuotaExhausted(lastError)) break;
     }
   }
-  
-  console.error("[Gemini] All models failed. Last error:", lastError);
-  // Re-throw the original error so route-level quota detection can inspect it
+
+  console.error(`[Gemini] All ${allKeys.length} key(s) × ${MODELS.length} model(s) failed.`);
   if (lastError) throw lastError;
-  throw new Error("All Gemini models failed. Please try again later.");
+  throw new Error("All Gemini keys and models failed. Please try again later.");
 }
+
 
 export async function synthesizePost(
   topic: string,
@@ -77,10 +214,6 @@ export async function synthesizePost(
   voiceProfile?: any,
   hashtagCount = 5,
 ): Promise<string> {
-  if (!ai) {
-    throw new Error("AI service is not configured. GEMINI_API_KEY is missing.");
-  }
-
   // Build voice instructions from profile
   let voiceInstructions = "";
   if (voiceProfile) {
@@ -148,16 +281,10 @@ export async function synthesizePost(
     HashTags: Generate exactly ${hashtagCount} relevant hashtags.
   `;
 
-  return callWithRetryAndFallback(async (model) => {
-    const response = await ai.models.generateContent({
-      model,
-      contents: prompt,
-      config: {
-        tools: [{ googleSearch: {} }],
-        temperature: 0.8,
-      },
-    });
-    return response.text || "";
+  return callWithRotationAndFallback(async (ai, model) => {
+    const genModel = ai.getGenerativeModel({ model });
+    const response = await genModel.generateContent(prompt);
+    return response.response.text() || "";
   });
 }
 
@@ -167,10 +294,6 @@ export async function iteratePost(
   existingHashtags: string[] = [],
   hashtagCount = 5,
 ): Promise<string> {
-  if (!ai) {
-    throw new Error("AI service is not configured. GEMINI_API_KEY is missing.");
-  }
-
   const prompt = `
     You are an expert LinkedIn copywriter editing an existing post.
 
@@ -191,15 +314,10 @@ export async function iteratePost(
     6. Return ONLY updated content.
   `;
 
-  return callWithRetryAndFallback(async (model) => {
-    const response = await ai.models.generateContent({
-      model,
-      contents: prompt,
-      config: {
-        temperature: 0.7,
-      },
-    });
-    return response.text || "";
+  return callWithRotationAndFallback(async (ai, model) => {
+    const genModel = ai.getGenerativeModel({ model });
+    const response = await genModel.generateContent(prompt);
+    return response.response.text() || "";
   });
 }
 
